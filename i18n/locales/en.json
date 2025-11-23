@@ -1,0 +1,333 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "close": "Close"
+    },
+    "altNews": {
+        "pageTitle": "ALT News",
+        "pageDescription": "Discover the latest ALT News and updates from CS Conseil. Stay informed about developments and innovations in our sector.",
+        "detailTitle": "ALT #{id} - {title}",
+        "detailDescription": "{content}...",
+        "defaultDetailDescription": "Read ALT News #{id} from CS Conseil: {title}"
+    },
+    "shop": {
+        "noProducts": "No products available at the moment",
+        "loadError": "An error occurred while loading products",
+        "addedToCart": "Product added to cart",
+        "refresh": "Refresh",
+        "unnamed": "Unnamed product"
+    },
+    "header": {
+        "index": "Home",
+        "services": "Services",
+        "events": "Events",
+        "news": "News",
+        "alt-news": "ALT News",
+        "alt_connect": "ALT Connect",
+        "stationery": "Stationery",
+        "contact": "Contact"
+    },
+    "about": {
+        "title": "Discover us",
+        "subtitle": "We collaborate with you to bring your",
+        "subtitle_end": "vision to life",
+        "activity": "Cases handled, illustrating the diversity of situations encountered and the relevance of our interventions."
+    },
+    "values": {
+        "team": {
+            "title": "A young and#ambitious team",
+            "description": "Our dynamic team combines energy, responsiveness and expertise to effectively address contemporary challenges."
+        },
+        "watch": {
+            "title": "Constant legal and tax monitoring",
+            "description": "We stay alert to legal and tax developments to ensure our clients receive up-to-date and strategic advice."
+        },
+        "flexibility": {
+            "title": "Flexibility and#adaptability",
+            "description": "Our adaptability allows us to adjust our approach and solutions according to specific circumstances and needs."
+        },
+        "african": {
+            "title": "Deeply African#values",
+            "description": "We place humanity, solidarity and excellence at the heart of our actions, with strong roots in African realities."
+        }
+    },
+    "headlines": {
+        "title": "Headlines",
+        "no_content": "No headlines available at the moment"
+    },
+    "news": {
+        "title": "Stay informed about legal and tax news",
+        "subtitle": "Discover the latest news and our initiatives",
+        "loading": "Loading news...",
+        "error": {
+            "title": "Oops! Something went wrong.",
+            "retry": "Try again"
+        },
+        "empty": {
+            "title": "No news available",
+            "description": "There are currently no news articles to display."
+        },
+        "read_more": "Read more",
+        "pageTitle": "News",
+        "pageDescription": "Discover the latest news and updates from CS Conseil. Follow our developments and stay informed about our activities.",
+        "detailTitle": "{title} - {country}",
+        "detailDescription": "{title} in {country}: {subtitle}. Published on {date}",
+        "defaultDetailDescription": "Discover our news {title} from {country}"
+    },
+    "constant": {
+        "addToCart": "Add to cart",
+        "removeFromCart": "Remove from cart",
+        "doc_no_availlable": "No document available at the moment",
+        "explore_details": "Explore the details below.",
+        "our_services": "Our services",
+        "contact_us": "Contact us",
+        "our_projects": "Our projects",
+        "our_packages": "Our packages",
+        "our_contact": "Our contacts",
+        "our_socials": "Our social networks",
+        "useful_link": "Useful links",
+        "newsletter": {
+            "title": "Stay informed of our news",
+            "description": "Receive our latest news and advice directly in your inbox",
+            "placeholder": "Your email address",
+            "success": "Successfully registered! Thank you for subscribing to our newsletter.",
+            "error": "An error occurred. Please try again."
+        },
+        "see_also": "See also",
+        "companies": {
+            "group": "Holding",
+            "finance": "Finance & accounting",
+            "legal": "Legal & tax consulting",
+            "tech": "Tech and Digital"
+        },
+        "all_rights_reserved": "All rights reserved",
+        "address": "Avenue Noël NEMIN, Zone 4 - Marcory ABIDJAN - Côte d'Ivoire"
+    },
+    "contact": {
+        "title": "Contact Us",
+        "description": "We are here to assist you with your legal and tax needs",
+        "waiting": "We are here",
+        "contact_with_us": "Contact with us",
+        "how_to_find": "How to find us ?",
+        "our_contact": "Our contacts",
+        "call_directly": "Call us directly",
+        "need_support": "Need support?",
+        "form": {
+            "title": "Send us a message",
+            "subtitle": "Fill out the form below and we will get back to you as soon as possible",
+            "full_name": "Your full name*",
+            "email": "Email address*",
+            "website": "Your website",
+            "message": "How can we help you?",
+            "send": "Send message",
+            "sending": "Sending...",
+            "company_name": "Company name",
+            "loading_subjects": "Loading subjects...",
+            "select_subject": "Select a subject",
+            "success": "Your message has been sent successfully. We will respond as soon as possible.",
+            "error": "An error occurred while sending the message. Please try again.",
+            "errors": {
+                "name_required": "Name is required",
+                "email_required": "Email address is required",
+                "email_invalid": "Please enter a valid email address",
+                "message_required": "Message is required",
+                "subject_required": "Subject is required",
+                "company_name_required": "Company name is required",
+                "message_too_short": "Message must be at least 10 characters long"
+            }
+        }
+    },
+    "services": {
+        "title": "Our services",
+        "subtitle": "Tax and legal solutions",
+        "loading": "Loading services...",
+        "error": {
+            "title": "Oops! Something went wrong.",
+            "retry": "Try Again"
+        },
+        "empty": {
+            "title": "No services found",
+            "description": "There are currently no services available."
+        },
+        "sections": {
+            "fiscal": "Tax",
+            "legal": "Legal"
+        }
+    },
+    "events": {
+        "title": "Our events",
+        "subtitle": "Stay informed about our next appointments",
+        "loading": "Loading events...",
+        "error": {
+            "title": "Oops! Something went wrong.",
+            "retry": "Try Again"
+        },
+        "empty": {
+            "title": "No events available",
+            "description": "There are currently no events to display."
+        },
+        "continue_reading": "Continue reading",
+        "pageTitle": "Events",
+        "pageDescription": "Discover all CS Conseil events and gatherings. Stay informed about our activities and professional meetings.",
+        "detailTitle": "{title} - {country}",
+        "detailDescription": "{title} in {country}: {subtitle}",
+        "defaultDetailDescription": "Discover the {title} event organized by CS Conseil in {country}"
+    },
+    "alt_news": {
+        "title": "ALT News",
+        "subtitle": "Your legal, social and tax newsletter",
+        "subtitle_span": "published every 1st Wednesday of the month",
+        "description": "We are more than committed to providing you with quality and up-to-date information. We are working hard to create even richer and more relevant content to meet your expectations and exceed your anticipations.",
+        "loading": "Loading news...",
+        "error": {
+            "title": "Oops! Something went wrong.",
+            "retry": "Try Again"
+        },
+        "empty": {
+            "title": "No news found",
+            "description": "There are currently no news available."
+        }
+    },
+    "stationery": {
+        "title": "Legal",
+        "title_span": "stationery",
+        "blocks": {
+            "organization": {
+                "title": "Efficient Organization",
+                "description": "At Coumbassa & Sanden Conseil, we understand the importance of efficient organization for general meetings and board meetings."
+            },
+            "ohada": {
+                "title": "OHADA compliance",
+                "description": "Having attendance registers and minutes that comply with OHADA provisions saves precious time."
+            },
+            "strategy": {
+                "title": "Strategic focus",
+                "description": "This anticipation not only ensures legal compliance but allows you to focus on what really matters: making strategic decisions for your business."
+            },
+            "legal": {
+                "title": "Legal assurance",
+                "description": "Ensure you are always compliant with legal requirements by ordering your registers."
+            }
+        },
+        "loading": "Loading product details...",
+        "error": {
+            "title": "Oops! Something went wrong.",
+            "retry": "Try Again",
+            "generic": "An error occurred while loading the product details"
+        },
+        "sidebar": {
+            "addToCart": "Add to cart",
+            "addToCartButton": "Add to cart"
+        },
+        "pageTitle": "Stationery",
+        "pageDescription": "Discover our selection of professional stationery products. CS Conseil offers a complete range for all your needs.",
+        "detailTitle": "{name} - {price}",
+        "detailDescription": "Discover {name} at {price}. {description}",
+        "defaultDetailDescription": "Discover our product {name}, available at {price}"
+    },
+    "newsDetail": {
+        "pdfSection": {
+            "title": "PDF Document"
+        },
+        "loading": "Loading news details...",
+        "pdfVersion": "PDF Version",
+        "downloadPdf": "Download PDF",
+        "error": {
+            "title": "Oops! Something went wrong.",
+            "retry": "Try Again"
+        },
+        "videoSection": {
+            "title": "Youtube Video"
+        },
+        "sidebar": {
+            "company": "COUMBASSA & SANDEN CONSEIL",
+            "contact": {
+                "title": "Contact us",
+                "phone": "+999 325 654 8596"
+            }
+        }
+    },
+    "eventDetail": {
+        "loading": "Loading event details...",
+        "error": {
+            "title": "Oops! Something went wrong.",
+            "retry": "Try Again"
+        },
+        "videoSection": {
+            "title": "Youtube Video"
+        },
+        "sidebar": {
+            "company": "COUMBASSA & SANDEN CONSEIL",
+            "contact": {
+                "title": "Contact us",
+                "phone": "+999 325 654 8596"
+            }
+        },
+        "emptyContent": {
+            "title": "Content in preparation",
+            "description": "The detailed content will be available soon."
+        }
+    },
+    "hero": {
+        "loading": "Loading hero content...",
+        "error": {
+            "title": "Oops! Something went wrong.",
+            "message": "Failed to load content",
+            "retry": "Try Again"
+        },
+        "empty": {
+            "title": "No hero content found",
+            "description": "There is currently no hero content available."
+        },
+        "contact": {
+            "description": "Schedule a consultation to discuss your legal needs and goals today",
+            "button": "Contact us"
+        }
+    },
+    "cart": {
+        "title": "My Cart",
+        "empty": "Your cart is empty",
+        "total": "Total:",
+        "checkout": "Proceed to checkout",
+        "remove": "Remove item",
+        "decrease": "Decrease quantity",
+        "increase": "Increase quantity",
+        "addToCart": "Add to cart"
+    },
+    "my-hero": {
+        "title": "Welcome to your site dedicated to",
+        "highlight": "legal and tax consulting",
+        "description1": "We support our clients with expertise and professionalism in all their legal and tax needs.",
+        "description2": "Our experienced team offers you personalized solutions tailored to your challenges.",
+        "card1": {
+            "title": "Expertise",
+            "subtitle": "Legal"
+        },
+        "card2": {
+            "title": "Consulting",
+            "subtitle": "Tax"
+        }
+    },
+    "service-description": {
+        "years_experience": "Years of experience",
+        "experts": "Experts dedicated to your success",
+        "intro": {
+            "text_1": "At Coumbassa & Sanden Conseil, we believe in the ",
+            "text_2": "power of legal and fiscal anticipation. ",
+            "text_3": "by analyzing the regulatory developments and new technologies, we will offer you solutions Innovativeby analyzing the regulatory developments and new technologies, we will offer you solutions  Innovative ",
+            "text_4": "TaxTech ",
+            "text_5": "and ",
+            "text_6": "LegalTech ",
+            "text_7": "and we will help you stay competitive in a constantly evolving legal environment."
+        },
+        "approach": "Support, proximity, and tailor-made solutions are at the heart of our approach.",
+        "commitment": "We are committed by your side!"
+    },
+    "error": {
+        "page_not_found": "Page not found",
+        "error_occurred": "An error occurred",
+        "404_message": "The page you are looking for does not exist.",
+        "default_message": "We are currently experiencing technical difficulties.",
+        "back": "Back"
+    }
+}

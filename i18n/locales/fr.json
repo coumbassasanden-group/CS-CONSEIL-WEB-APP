@@ -1,0 +1,334 @@
+{
+    "common": {
+        "loading": "Chargement...",
+        "close": "Fermer"
+    },
+    "altNews": {
+        "pageTitle": "ALT News",
+        "pageDescription": "Découvrez les dernières actualités et mises à jour ALT de CS Conseil. Restez informés des évolutions et des innovations dans notre secteur.",
+        "detailTitle": "ALT #{id} - {title}",
+        "detailDescription": "{content}...",
+        "defaultDetailDescription": "Consultez l'actualité ALT #{id} de CS Conseil: {title}"
+    },
+    "shop": {
+        "noProducts": "Aucun produit disponible pour le moment",
+        "loadError": "Une erreur est survenue lors du chargement des produits",
+        "addedToCart": "Produit ajouté au panier",
+        "refresh": "Actualiser",
+        "unnamed": "Produit sans nom"
+    },
+    "header": {
+        "index": "Accueil",
+        "services": "Services",
+        "events": "Événements",
+        "news": "Actualités",
+        "alt-news": "ALT News",
+        "alt_connect": "ALT Connect",
+        "stationery": "Papeterie",
+        "contact": "Contact"
+    },
+    "about": {
+        "title": "Découvrez-nous",
+        "subtitle": "Nous collaborons avec vous pour donner",
+        "subtitle_end": "vie à votre vision.",
+        "activity": "Dossiers traités, illustrant la diversité des situations rencontrées et la pertinence de nos interventions."
+    },
+    "values": {
+        "team": {
+            "title": "Une équipe jeune et ambitieuse",
+            "description": "Notre équipe dynamique allie énergie, réactivité et compétences pointues pour répondre avec efficacité aux défis contemporains."
+        },
+        "watch": {
+            "title": "Veille juridique et fiscale constante",
+            "description": "Nous restons en alerte sur les évolutions légales et fiscales pour garantir à nos clients des conseils toujours à jour et stratégiques."
+        },
+        "flexibility": {
+            "title": "Flexibilité et adaptabilité",
+            "description": "Notre capacité d'adaptation nous permet d'ajuster notre approche et nos solutions en fonction des circonstances et des besoins spécifiques."
+        },
+        "african": {
+            "title": "Des valeurs profondément africaines",
+            "description": "Nous plaçons l'humain, la solidarité et l'excellence au cœur de nos actions, avec un ancrage fort dans les réalités africaines."
+        }
+    },
+    "headlines": {
+        "title": "À la une",
+        "no_content": "Aucune actualité à la une pour le moment"
+    },
+    "news": {
+        "title": "Informez vous des actualités juridiques et fiscales",
+        "subtitle": "Découvrez les dernières nouvelles et nos initiatives",
+        "loading": "Chargement des actualités...",
+        "error": {
+            "title": "Oops! Une erreur est survenue.",
+            "retry": "Réessayer"
+        },
+        "empty": {
+            "title": "Aucune actualité disponible",
+            "description": "Il n'y a actuellement aucun article à afficher."
+        },
+        "read_more": "Lire la suite",
+        "pageTitle": "Actualités",
+        "pageDescription": "Découvrez les dernières actualités et mises à jour de CS Conseil. Suivez nos développements et restez informés de nos activités.",
+        "detailTitle": "{title} - {country}",
+        "detailDescription": "{title} à {country}: {subtitle}. Publié le {date}",
+        "defaultDetailDescription": "Découvrez notre actualité {title} depuis {country}"
+    },
+    "constant": {
+        "addToCart": "Ajouter au panier",
+        "removeFromCart": "Retirer du panier",
+        "doc_no_availlable": "Aucun document disponible pour le moment",
+        "explore_details": "Explorer les détails ci-dessous.",
+        "our_services": "Nos services",
+        "contact_us": "Contactez-nous",
+        "our_projects": "Nos projets",
+        "our_packages": "Nos packs",
+        "our_contact": "Nos contacts",
+        "our_socials": "Nos réseaux sociaux",
+        "useful_link": "Liens utiles",
+        "newsletter": {
+            "title": "Restez informés de nos actualités",
+            "description": "Recevez nos dernières nouvelles et conseils directement dans votre boîte mail",
+            "placeholder": "Votre adresse email",
+            "success": "Inscription réussie ! Merci de vous être abonné(e) à notre newsletter.",
+            "error": "Une erreur est survenue. Veuillez réessayer."
+        },
+        "see_also": "Voir aussi",
+        "companies": {
+            "group": "Holding",
+            "finance": "Finance & comptabilité",
+            "legal": "Conseil juridique et fiscal",
+            "tech": "Tech et Digital"
+        },
+        "all_rights_reserved": "Tous droits réservés",
+        "address": "Avenue Noël NEMIN, Zone 4 - Marcory ABIDJAN - Côte d'Ivoire"
+    },
+    "contact": {
+        "title": "Contactez-nous",
+        "description": "Nous sommes là pour vous accompagner dans vos besoins juridiques et fiscaux",
+        "waiting": "Nous sommes ici",
+        "contact_with_us": "Contactez-nous",
+        "how_to_find": "Comment nous trouver ?",
+        "our_contact": "Nos contacts",
+        "loading_subjects": "Chargement des objets...",
+        "call_directly": "Appelez-nous",
+        "need_support": "Besoin d'aide ?",
+        "hear_from_you": "Nous sommes à votre écoute",
+        "form": {
+            "title": "Envoyez-nous un message",
+            "subtitle": "Remplissez le formulaire ci-dessous et nous vous répondrons dans les plus brefs délais",
+            "full_name": "Votre nom complet*",
+            "email": "Adresse email*",
+            "website": "Votre site web",
+            "message": "Comment pouvons-nous vous aider ?",
+            "send": "Envoyez votre message",
+            "sending": "Envoi en cours...",
+            "company_name": "Nom de la société",
+            "select_subject": "Sélectionnez un sujet",
+            "success": "Votre message a été envoyé avec succès. Nous vous répondrons dans les plus brefs délais.",
+            "error": "Une erreur est survenue lors de l'envoi du message. Veuillez réessayer.",
+            "errors": {
+                "name_required": "Le nom est requis",
+                "email_required": "L'adresse email est requise",
+                "email_invalid": "Veuillez entrer une adresse email valide",
+                "message_required": "Le message est requis",
+                "subject_required": "Le sujet est requis",
+                "company_name_required": "Le nom de la société est requis",
+                "message_too_short": "Le message doit comporter au moins 10 caractères"
+            }
+        }
+    },
+    "services": {
+        "title": "Nos services",
+        "subtitle": "Solutions fiscales et juridiques",
+        "loading": "Chargement des services...",
+        "error": {
+            "title": "Oops! Une erreur s'est produite.",
+            "retry": "Réessayer"
+        },
+        "empty": {
+            "title": "Aucun service trouvé",
+            "description": "Il n'y a actuellement aucun service disponible."
+        },
+        "sections": {
+            "fiscal": "Fiscal",
+            "legal": "Juridique"
+        }
+    },
+    "events": {
+        "title": "Nos événements",
+        "subtitle": "Restez informés de nos prochains rendez-vous",
+        "loading": "Chargement des événements...",
+        "error": {
+            "title": "Oops! Une erreur est survenue.",
+            "retry": "Réessayer"
+        },
+        "empty": {
+            "title": "Aucun événement disponible",
+            "description": "Il n'y a actuellement aucun événement à afficher."
+        },
+        "continue_reading": "Lire la suite",
+        "pageTitle": "Événements",
+        "pageDescription": "Découvrez tous les événements et manifestations de CS Conseil. Restez informé de nos activités et rencontres professionnelles.",
+        "detailTitle": "{title} - {country}",
+        "detailDescription": "{title} à {country}: {subtitle}",
+        "defaultDetailDescription": "Découvrez l'événement {title} organisé par CS Conseil à {country}"
+    },
+    "alt_news": {
+        "title": "ALT News",
+        "subtitle": "Votre newsletter juridique, sociale et fiscale",
+        "subtitle_span": "publiée chaque 1er Mercredi du mois",
+        "description": "Nous sommes plus qu'engagés à vous fournir des informations de qualité et à jour. Nous travaillons ardemment sur la création d'un contenu encore plus riche et pertinent, afin de répondre à vos attentes et dépasser vos anticipations.",
+        "loading": "Chargement des actualités...",
+        "error": {
+            "title": "Oops! Une erreur s'est produite.",
+            "retry": "Réessayer"
+        },
+        "empty": {
+            "title": "Aucune actualité trouvée",
+            "description": "Il n'y a actuellement aucune actualité disponible."
+        }
+    },
+    "stationery": {
+        "title": "La papeterie",
+        "title_span": "juridique",
+        "blocks": {
+            "organization": {
+                "title": "Organisation Efficace",
+                "description": "Chez Coumbassa & Sanden conseil, nous comprenons l'importance d'une organisation efficace pour les assemblées générales et les conseils d'administration."
+            },
+            "ohada": {
+                "title": "Conformité OHADA",
+                "description": "Avoir des registres de présence et des procès-verbaux conformes aux dispositions OHADA permet de gagner un temps précieux."
+            },
+            "strategy": {
+                "title": "Focus stratégique",
+                "description": "Cette anticipation garantit non seulement la conformité juridique, vous permettant de vous concentrer sur ce qui compte vraiment : la prise de décisions stratégiques pour votre entreprise."
+            },
+            "legal": {
+                "title": "Assurance légale",
+                "description": "Assurez-vous d'être toujours en conformité avec les exigences légales en commandant vos registres."
+            }
+        },
+        "loading": "Chargement des détails du produit...",
+        "error": {
+            "title": "Oops! Une erreur est survenue.",
+            "retry": "Réessayer",
+            "generic": "Une erreur est survenue lors du chargement des détails du produit"
+        },
+        "sidebar": {
+            "addToCart": "Ajouter au panier",
+            "addToCartButton": "Ajouter au panier"
+        },
+                "pageTitle": "Papeterie",
+        "pageDescription": "Découvrez notre sélection de produits de papeterie professionnelle. CS Conseil vous propose une gamme complète pour tous vos besoins.",
+        "detailTitle": "{name} - {price}",
+        "detailDescription": "Découvrez {name} à {price}. {description}",
+        "defaultDetailDescription": "Découvrez notre produit {name}, disponible à {price}"
+    },
+    "newsDetail": {
+        "pdfSection": {
+            "title": "Document PDF"
+        },
+        "loading": "Chargement des détails de l'actualité...",
+        "pdfVersion": "Version PDF",
+        "downloadPdf": "Télécharger le PDF",
+        "error": {
+            "title": "Oops! Une erreur s'est produite.",
+            "retry": "Réessayer"
+        },
+        "videoSection": {
+            "title": "Vidéo Youtube"
+        },
+        "sidebar": {
+            "company": "COUMBASSA & SANDEN CONSEIL",
+            "contact": {
+                "title": "Contactez-nous",
+                "phone": "+999 325 654 8596"
+            }
+        }
+    },
+    "eventDetail": {
+        "loading": "Chargement des détails de l'événement...",
+        "error": {
+            "title": "Oops! Une erreur s'est produite.",
+            "retry": "Réessayer"
+        },
+        "videoSection": {
+            "title": "Vidéo Youtube"
+        },
+        "sidebar": {
+            "company": "COUMBASSA & SANDEN CONSEIL",
+            "contact": {
+                "title": "Contactez-nous",
+                "phone": "+999 325 654 8596"
+            }
+        },
+        "emptyContent": {
+            "title": "Contenu en cours de préparation",
+            "description": "Le contenu détaillé sera bientôt disponible."
+        }
+    },
+    "hero": {
+        "loading": "Chargement du contenu...",
+        "error": {
+            "title": "Oups ! Une erreur est survenue.",
+            "message": "Impossible de charger le contenu",
+            "retry": "Réessayer"
+        },
+        "empty": {
+            "title": "Aucun contenu trouvé",
+            "description": "Il n'y a actuellement aucun contenu disponible."
+        },
+        "contact": {
+            "description": "Planifiez une consultation pour discuter de vos besoins et objectifs juridiques dès aujourd'hui",
+            "button": "Contactez-nous"
+        }
+    },
+    "cart": {
+        "title": "Mon Panier",
+        "empty": "Votre panier est vide",
+        "total": "Total:",
+        "checkout": "Procéder au paiement",
+        "remove": "Supprimer l'article",
+        "decrease": "Diminuer la quantité",
+        "increase": "Augmenter la quantité",
+        "addToCart": "Ajouter au panier"
+    },
+    "my-hero": {
+        "title": "Bienvenue sur votre site dédié au",
+        "highlight": "conseil juridique et fiscal",
+        "description1": "Nous accompagnons nos clients avec expertise et professionnalisme dans tous leurs besoins juridiques et fiscaux.",
+        "description2": "Notre équipe expérimentée vous offre des solutions personnalisées et adaptées à vos enjeux.",
+        "card1": {
+            "title": "Expertise",
+            "subtitle": "Juridique"
+        },
+        "card2": {
+            "title": "Conseil",
+            "subtitle": "Fiscal"
+        }
+    },
+    "service-description": {
+        "years_experience": "Années d'expérience",
+        "experts": "Experts dédiés à votre réussite",
+        "intro": {
+            "text_1": "Chez COUMBASSA & SANDEN CONSEIL, nous croyons en la ",
+            "text_2": "puissance de l'anticipation juridique et fiscale. ",
+            "text_3": "En analysant les évolutions réglementaires et les nouvelles technologies, nous vous proposerons des solutions innovantes ",
+            "text_4": "TaxTech ",
+            "text_5": "et ",
+            "text_6": "LegalTech ",
+            "text_7": "et nous vous aiderons à rester compétitif dans un environnement juridique en constante évolution."
+        },
+        "approach": "L'accompagnement, la proximité, le sur-mesure, sont au cœur de notre approche.",
+        "commitment": "Nous sommes engagés à vos côtés !"
+    },
+    "error": {
+        "page_not_found": "Page introuvable",
+        "error_occurred": "Une erreur est survenue",
+        "404_message": "La page que vous recherchez n'existe pas.",
+        "default_message": "Nous rencontrons actuellement des difficultés techniques.",
+        "back": "Retour"
+    }
+}
