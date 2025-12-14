@@ -7,7 +7,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBaseUrl: process.env.API_BASE_URL || 'https://nextapi.coumbassa-sanden.com'
+      apiBaseUrl: process.env.API_BASE_URL || 'https://nextapi.coumbassa-sanden.com',
+      apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'http://localhost:3000/api/',
     }
     //http://213.199.36.68:5020
   },
@@ -24,7 +25,7 @@ export default defineNuxtConfig({
   ],
 
   app: {
-    // baseURL: '/next-coumbassa-sanden/',
+    baseURL: '/dev_alt-news',
     // buildAssetsDir: '/next-coumbassa-sanden/',
     // head: {
     //   script: [
