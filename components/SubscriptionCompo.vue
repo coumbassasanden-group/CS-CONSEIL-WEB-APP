@@ -1,38 +1,5 @@
 <template>
   <div class="subscriber-page">
-    <!-- Hero Section -->
-    <section class="hero-section">
-      <div class="container">
-        <div class="hero-content">
-          <div class="hero-badge">
-            <span class="badge-icon">🎯</span>
-            <span>Rejoignez {{ stats.subscribers }} abonnés satisfaits</span>
-          </div>
-          <h1 class="hero-title">
-            Accédez à l'information
-            <span class="gradient-text">de qualité</span>
-          </h1>
-          <p class="hero-subtitle">
-            Découvrez nos analyses approfondies, nos reportages exclusifs et restez informé 
-            avec ALT News. Choisissez le plan qui vous convient.
-          </p>
-          <div class="hero-stats">
-            <div class="stat-item">
-              <div class="stat-value">{{ stats.articles }}</div>
-              <div class="stat-label">Articles</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ stats.satisfaction }}</div>
-              <div class="stat-label">Satisfaction</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value">{{ stats.countries }}</div>
-              <div class="stat-label">Pays</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <!-- Plans Section -->
     <section id="plans" class="plans-section">
@@ -44,7 +11,14 @@
           </p>
         </div>
 
-        <div class="pricing-grid">
+        <!-- Loading state -->
+        <div v-if="plansLoading" class="loading-state">
+          <div class="spinner"></div>
+          <p>Chargement des plans d'abonnement...</p>
+        </div>
+
+        <!-- Plans Grid -->
+        <div v-if="!plansLoading && subscriptionPlans.length > 0" class="pricing-grid">
           <PricingCard
             v-for="plan in subscriptionPlans"
             :key="plan.id"
@@ -53,51 +27,28 @@
             @select="handlePlanSelect"
           />
         </div>
+
+        <!-- Error state -->
+        <div v-if="plansError" class="error-state">
+          <div class="error-icon">⚠️</div>
+          <h3>Erreur de chargement</h3>
+          <p>{{ plansError }}</p>
+          <button class="btn-retry" @click="retryLoadPlans">
+            Réessayer
+          </button>
+        </div>
+
+        <!-- Empty state -->
+        <div v-if="!plansLoading && subscriptionPlans.length === 0 && !plansError" class="empty-state">
+          <p>Aucun plan d'abonnement disponible pour le moment.</p>
+        </div>
       </div>
     </section>
 
-    <!-- Form Section -->
+    <!-- Form Section - New Email-First Workflow -->
     <section v-if="subscriptionForm.planId" class="form-section">
       <div class="container-small">
-        <SubscriptionForm
-          :form-data="subscriptionForm"
-          :selected-plan="getSelectedPlan"
-          :is-processing="isProcessing"
-          :error="errorMessage"
-          @submit="handleSubmit"
-        />
-      </div>
-    </section>
-
-    <!-- Testimonials Section -->
-    <section class="testimonials-section">
-      <div class="container">
-        <div class="section-header">
-          <h2 class="section-title">Ce que disent nos abonnés</h2>
-          <p class="section-subtitle">
-            Rejoignez des milliers de lecteurs satisfaits
-          </p>
-        </div>
-
-        <div class="testimonials-grid">
-          <div
-            v-for="testimonial in testimonials"
-            :key="testimonial.id"
-            class="testimonial-card"
-          >
-            <div class="testimonial-header">
-              <div class="testimonial-avatar">{{ testimonial.avatar }}</div>
-              <div class="testimonial-info">
-                <h4>{{ testimonial.name }}</h4>
-                <p>{{ testimonial.role }} - {{ testimonial.company }}</p>
-              </div>
-            </div>
-            <div class="testimonial-rating">
-              <span v-for="i in testimonial.rating" :key="i" class="star">★</span>
-            </div>
-            <p class="testimonial-comment">{{ testimonial.comment }}</p>
-          </div>
-        </div>
+        <SubscriptionFormEmail />
       </div>
     </section>
 
@@ -133,18 +84,6 @@
       </div>
     </section>
 
-    <!-- CTA Section -->
-    <section class="cta-section">
-      <div class="container">
-        <div class="cta-content">
-          <h2>Prêt à commencer ?</h2>
-          <p>Rejoignez-nous dès aujourd'hui et accédez à du contenu d'exception</p>
-          <button class="btn-cta" @click="scrollToPlans" type="button">
-            Voir les plans
-          </button>
-        </div>
-      </div>
-    </section>
 
     <!-- Payment Modal -->
     <PaymentAlert
@@ -170,10 +109,13 @@ const {
   stats,
   isProcessing,
   errorMessage,
+  plansLoading,
+  plansError,
   getSelectedPlan,
   selectPlan,
   processSubscription,
-  resetForm
+  resetForm,
+  fetchPlans
 } = useSubscription()
 
 // État local
@@ -185,8 +127,18 @@ const paymentModalMessage = ref('')
 const paymentModalDetails = ref<Record<string, string> | undefined>(undefined)
 const paymentProgress = ref(0)
 
+// Charger les plans au montage
+onMounted(async () => {
+  await fetchPlans()
+})
+
+// Recharger les plans
+const retryLoadPlans = async () => {
+  await fetchPlans()
+}
+
 // Gestion de la sélection de plan
-const handlePlanSelect = (planId: number) => {
+const handlePlanSelect = (planId: string) => {
   selectPlan(planId)
   
   // Scroll vers le formulaire
@@ -592,6 +544,106 @@ useHead({
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+/* Loading State */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  gap: 1.5rem;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e5e7eb;
+  border-top-color: var(--cs-brown-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-state p {
+  font-size: 1.1rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Error State */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  gap: 1rem;
+  background: #fee2e2;
+  border-radius: 12px;
+  border-left: 4px solid #dc2626;
+}
+
+.error-icon {
+  font-size: 2.5rem;
+}
+
+.error-state h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #991b1b;
+  margin: 0;
+}
+
+.error-state p {
+  font-size: 1rem;
+  color: #7f1d1d;
+  margin: 0;
+  text-align: center;
+  max-width: 500px;
+}
+
+.btn-retry {
+  margin-top: 1rem;
+  padding: 0.8rem 2rem;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-retry:hover {
+  background: #b91c1c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  text-align: center;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 2px dashed #e5e7eb;
+}
+
+.empty-state p {
+  font-size: 1.1rem;
+  margin: 0;
 }
 
 /* Responsive */

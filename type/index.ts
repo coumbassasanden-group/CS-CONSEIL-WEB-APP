@@ -229,3 +229,149 @@ export interface LoginDto {
 }
 
 export interface RegisterDto extends CreateUserDto {}
+
+// ==================== SUBSCRIPTION SPECIFIC TYPES ====================
+
+/**
+ * Interface pour le formulaire d'abonnement
+ */
+export interface SubscriptionFormData {
+  planId: number | null
+  email: string
+  firstName: string
+  lastName: string
+  company: string
+  phone: string
+  studentProof: File | null
+  acceptTerms: boolean
+  newsletter: boolean
+}
+
+/**
+ * Interface pour les plans d'abonnement avec métadonnées UI
+ */
+export interface PlanUI extends Plan {
+  nameKey?: string
+  periodKey?: string
+  rawFeatures?: string[]
+  color?: string
+  popular?: boolean
+  icon?: string
+  validation?: string
+  requiresProof?: boolean
+}
+
+/**
+ * Interface pour l'abonnement actuel
+ */
+export interface CurrentSubscriptionUI {
+  isActive: boolean
+  plan: Plan | PlanUI
+  startDate: Date | null
+  endDate: Date | null
+  autoRenew: boolean
+}
+
+/**
+ * Interface pour les témoignages
+ */
+export interface Testimonial {
+  id: number
+  name: string
+  role: string
+  company: string
+  avatar: string
+  rating: number
+  comment: string
+  date?: string
+}
+
+/**
+ * Interface pour les FAQ
+ */
+export interface FAQ {
+  id: number
+  question: string
+  answer: string
+}
+
+/**
+ * Interface pour les statistiques d'abonnement
+ */
+export interface SubscriptionStats {
+  subscribers: string
+  editions: string
+  satisfaction: string
+  years: string
+}
+
+/**
+ * Interface pour un plan normalisé (après parsing des données API)
+ * Tous les champs sont correctement typés (prix en nombre, features en tableau, etc.)
+ */
+export interface NormalizedPlan extends Plan {
+  price: number // Converti en nombre
+  features: string[] // Parsé en tableau depuis JSON string
+  duration: number // Converti en nombre
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+/**
+ * Réponse de l'API pour la récupération des plans
+ */
+export interface PlansApiResponse {
+  data: Plan[]
+  meta: PaginationMeta
+}
+
+/**
+ * Réponse de l'API pour un plan unique
+ */
+export interface PlanApiResponse {
+  data: Plan
+  message?: string
+}
+
+/**
+ * Réponse de l'API pour les abonnements
+ */
+export interface SubscriptionApiResponse {
+  data: Subscription | Subscription[]
+  message?: string
+  meta?: PaginationMeta
+}
+
+/**
+ * Réponse pour vérification d'email existant
+ */
+export interface CheckEmailResponse {
+  exists: boolean
+  email: string
+  firstName?: string
+  lastName?: string
+  phone?: string
+}
+
+/**
+ * Payload pour l'enregistrement d'un nouvel utilisateur
+ */
+export interface RegisterPayload {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+  phone: string
+}
+
+/**
+ * Réponse d'enregistrement d'utilisateur
+ */
+export interface RegisterResponse {
+  user?: User
+  token?: string
+  success?: boolean
+  message?: string
+  error?: string
+}

@@ -42,7 +42,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="tp-project-area tp-project-2-animate-tab pt-100 pb-110">
+    <div class="tp-project-area tp-project-2-animate-tab  pb-110">
         <div class="container">
             <!-- Section Title -->
             <div class="row align-items-end">
@@ -59,6 +59,7 @@ onMounted(() => {
                     </div>
                 </div>
             </div>
+
 
             <!-- Loading State -->
             <div v-if="loading" class="row">
@@ -87,6 +88,8 @@ onMounted(() => {
                     </div>
                 </div>
             </div>
+
+            
 
             <!-- Alt News List -->
             <div v-else class="row">

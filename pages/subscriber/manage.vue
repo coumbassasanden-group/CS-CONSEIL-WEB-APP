@@ -10,14 +10,65 @@
         <p class="page-subtitle">Gérez votre abonnement et accédez à vos articles ALT News</p>
       </div>
 
-      <div v-if="currentSubscription.isActive" class="subscription-content">
+      <div v-if="isLoading" class="loading-page">
+        <div class="spinner-large"></div>
+        <p>Chargement de votre profil...</p>
+      </div>
+
+      <div v-else-if="subscriptionData.isActive" class="subscription-content">
+        <!-- User Info Section -->
+        <div class="user-info-section">
+          <div class="user-info-card">
+            <div class="user-header">
+              <div class="user-avatar">
+                {{ getAuthUser()?.firstName?.charAt(0) }}{{ getAuthUser()?.lastName?.charAt(0) }}
+              </div>
+              <div class="user-details">
+                <h3 class="user-name">{{ getAuthUser()?.firstName }} {{ getAuthUser()?.lastName }}</h3>
+                <p class="user-email">{{ getAuthUser()?.email }}</p>
+                <span class="user-status">Abonné depuis le {{ formatDate(subscriptionData.startDate) }}</span>
+              </div>
+            </div>
+            <div style="color: white !important" class="user-meta">
+              <div class="meta-item">
+                <span class="meta-icon">
+                   <Icon icon="line-md:phone-filled" />
+                </span>
+                <div>
+                  <p class="meta-label">Téléphone</p>
+                  <p class="meta-value">{{ getAuthUser()?.phone || 'Non fourni' }}</p>
+                </div>
+              </div>
+              <div class="meta-item">
+                <span class="meta-icon">
+                  <Icon icon="mdi:user" />
+                </span>
+                <div>
+                  <p class="meta-label">Rôle</p>
+                  <p class="meta-value">{{ getAuthUser()?.role || 'Abonné' }}</p>
+                </div>
+              </div>
+              <div class="meta-item">
+                <span class="meta-icon">✅</span>
+                <div>
+                  <p class="meta-label">Statut</p>
+                  <p class="meta-value">{{ getAuthUser()?.isActive ? 'Actif' : 'Inactif' }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="main-grid">
           <div class="info-card">
             <div class="card-header">
               <div class="header-left">
-                <span class="plan-icon">{{ currentSubscription.plan?.icon }}</span>
+                <span class="plan-icon">
+                  <Icon icon="marketeq:gold-medal" />
+                  {{ subscriptionData.plan?.icon }}
+                </span>
                 <div>
-                  <h2>Plan {{ currentSubscription.plan?.name }}</h2>
+                  <h2>Plan {{ subscriptionData.plan?.name }}</h2>
                   <p class="plan-description">Abonnement actif</p>
                 </div>
               </div>
@@ -27,23 +78,23 @@
             <div class="card-body">
               <div class="info-grid">
                 <div class="info-item">
-                  <span class="info-label">💰 Montant</span>
+                  <span class="info-label"> <Icon icon="mdi:currency-usd" /> Montant</span>
                   <span class="info-value">
-                    {{ formatPrice(currentSubscription.plan?.price || 0, currentSubscription.plan?.currency) }}
+                    {{ formatPrice(subscriptionData.plan?.price || 0, subscriptionData.plan?.currency) }}
                   </span>
                 </div>
                 <div class="info-item">
-                  <span class="info-label">📅 Date de début</span>
-                  <span class="info-value">{{ formatDate(currentSubscription.startDate) }}</span>
+                  <span class="info-label"><Icon icon="mdi:calendar" /> Date de début</span>
+                  <span class="info-value">{{ formatDate(subscriptionData.startDate) }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-label">🔄 Prochain paiement</span>
-                  <span class="info-value">{{ formatDate(currentSubscription.endDate) }}</span>
+                  <span class="info-label"><Icon icon="mdi:calendar-clock" /> Prochain paiement</span>
+                  <span class="info-value">{{ formatDate(subscriptionData.endDate) }}</span>
                 </div>
                 <div class="info-item">
                   <span class="info-label">⚙️ Renouvellement</span>
                   <span class="info-value">
-                    <span v-if="currentSubscription.autoRenew" class="badge-success">Automatique</span>
+                    <span v-if="subscriptionData.autoRenew" class="badge-success">Automatique</span>
                     <span v-else class="badge-warning">Désactivé</span>
                   </span>
                 </div>
@@ -53,7 +104,7 @@
             <div class="card-footer">
               <h3 class="features-title">Inclus dans votre plan :</h3>
               <ul class="features-list">
-                <li v-for="(feature, index) in currentSubscription.plan?.rawFeatures" :key="index">
+                <li v-for="(feature, index) in subscriptionData.plan?.rawFeatures" :key="index">
                   <span class="check-icon">✓</span>
                   <span>{{ feature }}</span>
                 </li>
@@ -62,7 +113,7 @@
 
             <div class="renewal-section">
               <button 
-                v-if="!currentSubscription.autoRenew" 
+                v-if="!subscriptionData.autoRenew" 
                 @click="handleRenewSubscription" 
                 class="btn-renew"
                 :disabled="isRenewing"
@@ -82,7 +133,7 @@
             </div>
           </div>
 
-          <div class="quick-actions">
+          <div style="display: none;" class="quick-actions">
             <h3>Actions rapides</h3>
             <div class="actions-list">
               <button class="action-btn" @click="showUpgradeModal = true">
@@ -108,7 +159,7 @@
         <div class="articles-section">
           <div class="section-header">
             <h2>Mes articles ALT News</h2>
-            <p>Éditions disponibles avec votre abonnement {{ currentSubscription.plan?.name }}</p>
+            <p>Éditions disponibles avec votre abonnement {{ subscriptionData.plan?.name }}</p>
           </div>
 
           <div v-if="isLoadingArticles" class="loading-state">
@@ -223,11 +274,26 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { useSubscription } from '~/composables/useSubscription'
+import { useAuth } from '~/composables/useAuth'
+import { useRoute, navigateTo } from '#app'
+import { Icon } from "@iconify/vue";
+
+
+// Appliquer le middleware d'authentification
+definePageMeta({
+  middleware: 'auth'
+})
+
+const route = useRoute()
 const {
   currentSubscription,
   formatPrice,
   cancelSubscription
 } = useSubscription()
+
+const { isLoggedIn, getAuthUser } = useAuth()
 
 const showCancelModal = ref(false)
 const showUpgradeModal = ref(false)
@@ -239,6 +305,7 @@ const isRenewing = ref(false)
 const isTogglingRenew = ref(false)
 const isLoadingArticles = ref(true)
 const downloadingId = ref<number | null>(null)
+const isLoading = ref(true)
 
 const userArticles = ref([
   {
@@ -292,13 +359,62 @@ const formatDate = (date: Date | null) => {
   })
 }
 
+// Charger les données d'abonnement depuis localStorage
+const subscriptionData = ref<any>({
+  isActive: true, // Commencer par true pour afficher le contenu
+  plan: null,
+  startDate: new Date(),
+  endDate: null,
+  autoRenew: true
+})
+
+onMounted(() => {
+  isLoading.value = true
+  
+  // Vérifier la connexion
+  if (!isLoggedIn()) {
+    console.warn('Utilisateur non connecté, redirection vers success page')
+    navigateTo('/' + (route.params.locale || 'fr') + '/subscriber/success')
+    isLoading.value = false
+    return
+  }
+
+  // Charger le plan depuis localStorage
+  const savedPlan = localStorage.getItem('selectedPlan')
+  if (savedPlan) {
+    try {
+      const plan = JSON.parse(savedPlan)
+      subscriptionData.value.plan = plan
+      subscriptionData.value.isActive = true
+      subscriptionData.value.startDate = new Date()
+      
+      // Calculer la date de fin
+      if (plan.duration) {
+        const endDate = new Date()
+        endDate.setDate(endDate.getDate() + plan.duration)
+        subscriptionData.value.endDate = endDate
+      }
+    } catch (e) {
+      console.error('Erreur lors du chargement du plan:', e)
+      subscriptionData.value.isActive = false
+    }
+  } else {
+    console.warn('Aucun plan trouvé dans localStorage')
+    subscriptionData.value.isActive = false
+  }
+
+  // Simuler le chargement des articles
+  isLoadingArticles.value = false
+  isLoading.value = false
+})
+
 const handleRenewSubscription = async () => {
   isRenewing.value = true
   try {
     await new Promise(resolve => setTimeout(resolve, 1500))
     
-    currentSubscription.value.autoRenew = true
-    currentSubscription.value.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    subscriptionData.value.autoRenew = true
+    subscriptionData.value.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     
     successMessage.value = {
       title: 'Renouvellement réussi !',
@@ -317,11 +433,13 @@ const handleToggleAutoRenew = async () => {
   try {
     await new Promise(resolve => setTimeout(resolve, 1000))
     
-    currentSubscription.value.autoRenew = false
+    subscriptionData.value.autoRenew = !subscriptionData.value.autoRenew
     
     successMessage.value = {
-      title: 'Renouvellement automatique désactivé',
-      message: 'Votre abonnement ne sera plus renouvelé automatiquement. Pensez à le renouveler manuellement avant son expiration.'
+      title: subscriptionData.value.autoRenew ? 'Renouvellement activé' : 'Renouvellement désactivé',
+      message: subscriptionData.value.autoRenew 
+        ? 'Le renouvellement automatique de votre abonnement est maintenant activé.'
+        : 'Le renouvellement automatique de votre abonnement est maintenant désactivé.'
     }
     showSuccessModal.value = true
   } catch (error) {
@@ -332,34 +450,39 @@ const handleToggleAutoRenew = async () => {
 }
 
 const downloadArticle = async (articleId: number) => {
-  downloadingId.value = articleId
   try {
+    console.log('Téléchargement de l\'article:', articleId)
+    // Simuler le téléchargement
     await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    const article = userArticles.value.find(a => a.id === articleId)
-    if (article) {
-      successMessage.value = {
-        title: 'Téléchargement réussi !',
-        message: `L'édition "${article.title}" a été téléchargée. Vérifiez votre email.`
-      }
-      showSuccessModal.value = true
-    }
   } catch (error) {
-    console.error('Erreur de téléchargement:', error)
-  } finally {
-    downloadingId.value = null
+    console.error('Erreur lors du téléchargement:', error)
   }
 }
 
 const handleCancelSubscription = async () => {
-  const success = await cancelSubscription()
-  if (success) {
-    showCancelModal.value = false
-    setTimeout(() => {
-      navigateTo('/subscriber')
-    }, 2000)
+  if (!window.confirm('Êtes-vous sûr ? Cette action est irréversible.')) {
+    return
+  }
+
+  isRenewing.value = true
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    subscriptionData.value.isActive = false
+    
+    successMessage.value = {
+      title: 'Abonnement annulé',
+      message: 'Votre abonnement a été annulé avec succès. Vous pouvez toujours accéder aux articles jusqu\'à la fin de votre période actuelle.'
+    }
+    showSuccessModal.value = true
+  } catch (error) {
+    console.error('Erreur lors de l\'annulation:', error)
+  } finally {
+    isRenewing.value = false
   }
 }
+
+
 
 onMounted(() => {
   setTimeout(() => {
@@ -424,6 +547,115 @@ useHead({
   display: flex;
   flex-direction: column;
   gap: 2rem;
+}
+
+/* User Info Section Styles */
+.user-info-section {
+  margin-bottom: 1rem;
+}
+
+.user-info-card {
+  background: linear-gradient(135deg, var(--cs-brown-color) 0%, #a86a40 100%);
+  border-radius: 20px;
+  padding: 2.5rem;
+  color: white;
+  box-shadow: 0 8px 30px rgba(139, 92, 46, 0.3);
+}
+
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.user-avatar {
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.user-details {
+  flex: 1;
+}
+
+.user-name {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.user-email {
+  font-size: 1.05rem;
+  margin: 0 0 0.75rem 0;
+  opacity: 0.95;
+}
+
+.user-status {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.user-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.meta-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.meta-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.meta-label {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin: 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: white;
+}
+
+.meta-value {
+  font-size: 1.1rem;
+  margin: 0.25rem 0 0 0;
+  font-weight: 700;
+  color: white;
+}
+
+/* Ensure all text in user info section is white */
+.user-info-card {
+  color: white;
+}
+
+.user-info-card * {
+  color: white;
 }
 
 .main-grid {
@@ -983,5 +1215,41 @@ useHead({
   .header-left {
     width: 100%;
   }
+
+  .user-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .user-avatar {
+    width: 70px;
+    height: 70px;
+    font-size: 1.8rem;
+  }
+
+  .user-name {
+    font-size: 1.5rem;
+  }
+
+  .user-meta {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Loading page styles */
+.loading-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 70vh;
+  gap: 2rem;
+}
+
+.loading-page p {
+  font-size: 1.1rem;
+  color: #666;
+  font-weight: 500;
 }
 </style>

@@ -1,7 +1,12 @@
 <script setup lang="ts">
 const { get } = useApi()
 const texts = ref<string[]>([])
-const isLoading = ref(true)
+const isLoading = ref(true);
+const isSubcribe = ref(false);
+
+const handleSubscribe = () => {
+    isSubcribe.value = true
+}
 
 onMounted(async () => {
     try {
@@ -16,7 +21,7 @@ onMounted(async () => {
 
 <template>
     <section>
-        <div class="tp-chose-bottom pt-50 pb-50 p-relative z-indexm-1">
+        <div class="tp-chose-bottom pt-50 pb-5 p-relative z-indexm-1">
             <span class="tp-chose-shape-2 p-absolute d-none d-xxl-block">
                 <svg width="73" height="346" viewBox="0 0 73 346" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="-50" cy="123" r="122.5" stroke="#d4b128" stroke-opacity="0.5" />
@@ -38,8 +43,10 @@ onMounted(async () => {
                             
                             <!-- Contenu réel -->
                             <div v-else class="tp-chose-list mb-45 wow img-custom-anim-right" v-if="texts.length >= 2">
-                                <p class="cs-text-dark mb-25 fs-18">{{ texts[0] }}</p>
-                                <p class="cs-text-dark mb-70 fs-18">{{ texts[1] }}</p>
+                                <h2 class="form-title">La revue mensuelle ALT NEWS</h2>
+                                <div class="text-center">
+                                    <button @click="handleSubscribe"  class="subscribe-button">S'abonner</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -60,8 +67,8 @@ onMounted(async () => {
                         
                         <!-- Contenu réel -->
                         <div v-else class="tp-chose-content wow img-custom-anim-left" v-if="texts.length >= 4">
-                            <p class="cs-text-dark mb-25 fs-18">{{ texts[2] }}</p>
-                            <p class="cs-text-dark mb-70 fs-18">{{ texts[3] }}</p>
+                            <!-- <p class="cs-text-dark mb-25 fs-18">{{ texts[2] }}</p>
+                            <p class="cs-text-dark mb-70 fs-18">{{ texts[3] }}</p> -->
                             <div class="tp-chose-shape mt-5 text-end">
                                 <span>
                                     <svg style="transform: rotate(180deg);" width="199" height="122" viewBox="0 0 199 122" fill="none"
@@ -78,6 +85,7 @@ onMounted(async () => {
                         </div>
                     </div>
                 </div>
+                <subscription-compo v-if="isSubcribe" ></subscription-compo>
             </div>
         </div>
     </section>
@@ -138,5 +146,30 @@ onMounted(async () => {
 .fade-enter-from,
 .fade-leave-to {
     opacity: 0;
+}
+
+.form-title {
+    color: var(--cs-gold-color);
+    font-family: var(--tp-ff-body);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    line-height: 1.1;
+    margin-top: 0;
+    transition: color .3s ease-out 0s;
+}
+.subscribe-button{
+    background-color: var(--cs-brown-color);
+    box-shadow: 0 4px 15px #d4b1284d;
+    color: #fff;
+    cursor: pointer !important;
+    font-weight: 700;
+    overflow: hidden !important;
+    position: relative !important;
+    text-decoration: none !important;
+    transition: all .3s ease !important;
+    border: none !important;
+    border-radius: 50px;
+    margin-top: 1rem;
+    padding: 1rem 2rem;
 }
 </style>

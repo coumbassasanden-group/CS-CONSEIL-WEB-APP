@@ -13,20 +13,18 @@
 
       <!-- Contenu -->
       <div class="success-content">
-        <h1 class="success-title"> Bienvenue chez ALT News !</h1>
+        <h1 class="success-title">🎉 Bienvenue chez ALT News !</h1>
         <p class="success-message">
           Votre abonnement a été activé avec succès. Vous pouvez maintenant profiter de tous nos contenus exclusifs.
         </p>
 
         <!-- Résumé de l'abonnement -->
-        <div v-if="subscriptionData.isActive" class="subscription-summary">
+        <div v-if="currentSubscription.isActive" class="subscription-summary">
           <div class="summary-card">
             <div class="summary-header">
-              <span class="summary-icon">
-                <Icon icon="tabler:building-bank" />
-              </span>
+              <span class="summary-icon">{{ currentSubscription.plan?.icon }}</span>
               <div>
-                <h3>Plan {{ subscriptionData.plan?.name || 'Premium' }}</h3>
+                <h3>Plan {{ currentSubscription.plan?.name }}</h3>
                 <p class="summary-status">
                   <span class="status-badge active">Actif</span>
                 </p>
@@ -37,22 +35,22 @@
               <div class="detail-row">
                 <span class="detail-label">Montant</span>
                 <span class="detail-value">
-                  {{ formatPrice(subscriptionData.plan?.price || 0) }} 
-                  / {{ subscriptionData.plan?.period === 'month' ? 'mois' : 'an' }}
+                  {{ formatPrice(currentSubscription.plan?.price || 0) }} 
+                  / {{ currentSubscription.plan?.period === 'month' ? 'mois' : 'an' }}
                 </span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Date de début</span>
-                <span class="detail-value">{{ formatDate(subscriptionData.startDate) }}</span>
+                <span class="detail-value">{{ formatDate(currentSubscription.startDate) }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Prochain paiement</span>
-                <span class="detail-value">{{ formatDate(subscriptionData.endDate) }}</span>
+                <span class="detail-value">{{ formatDate(currentSubscription.endDate) }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Renouvellement auto.</span>
                 <span class="detail-value">
-                  <span v-if="subscriptionData.autoRenew" class="badge-success">Activé</span>
+                  <span v-if="currentSubscription.autoRenew" class="badge-success">Activé</span>
                   <span v-else class="badge-warning">Désactivé</span>
                 </span>
               </div>
@@ -65,17 +63,13 @@
           <h3>Que faire maintenant ?</h3>
           <div class="steps-grid">
             <div class="step-card">
-              <div class="step-icon">
-                <Icon icon="ic:baseline-email" />
-              </div>
+              <div class="step-icon">📧</div>
               <h4>Vérifiez votre email</h4>
               <p>Un email de confirmation avec tous les détails vous a été envoyé.</p>
             </div>
            
             <div class="step-card">
-              <div class="step-icon">
-                <Icon icon="mdi:bell" />
-              </div>
+              <div class="step-icon">🔔</div>
               <h4>Activez les notifications</h4>
               <p>Restez informé des dernières actualités en temps réel.</p>
             </div>
@@ -188,25 +182,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useSubscription } from '~/composables/useSubscription'
-import { Icon } from "@iconify/vue";
-// Type pour la réponse de connexion
-interface LoginResponse {
-  user: {
-    id: string
-    email: string
-    firstName: string
-    lastName: string
-    phone: string | null
-    role: string
-    isActive: boolean
-    createdAt: string
-    updatedAt: string
-  }
-  token: string
-}
-
 const {
   currentSubscription,
   formatPrice
@@ -222,103 +197,35 @@ const loginForm = ref({
   remember: false
 })
 
-// Récupérer les données d'abonnement depuis localStorage
-const subscriptionData = ref<any>({
-  isActive: true,
-  plan: null,
-  startDate: new Date(),
-  endDate: null,
-  autoRenew: true,
-  email: '',
-  firstName: '',
-  lastName: ''
-})
-
-// Données du plan sélectionné
-onMounted(() => {
-  // Récupérer le plan depuis localStorage
-  const savedPlan = localStorage.getItem('selectedPlan')
-  const userVerification = localStorage.getItem('userVerification')
-  
-  if (savedPlan) {
-    try {
-      const plan = JSON.parse(savedPlan)
-      subscriptionData.value.plan = plan
-      subscriptionData.value.startDate = new Date()
-      
-      // Calculer la date de fin en fonction de la durée du plan
-      if (plan.duration) {
-        const endDate = new Date()
-        endDate.setDate(endDate.getDate() + plan.duration)
-        subscriptionData.value.endDate = endDate
-      }
-    } catch (e) {
-      console.error('Erreur lors de la restauration du plan:', e)
-    }
-  }
-  
-  if (userVerification) {
-    try {
-      const user = JSON.parse(userVerification)
-      subscriptionData.value.email = user.email
-      subscriptionData.value.firstName = user.firstName
-      subscriptionData.value.lastName = user.lastName
-    } catch (e) {
-      console.error('Erreur lors de la restauration des données utilisateur:', e)
-    }
-  }
-})
-
 // Gestion de la connexion
 const handleLogin = async () => {
   loginError.value = ''
   isLoggingIn.value = true
 
   try {
-    const config = useRuntimeConfig()
-    const apiUrl = config.public.apiSubcriptionUrl || 'http://localhost:3001/api/'
+    // Simulation d'une connexion
+    await new Promise(resolve => setTimeout(resolve, 1500))
 
-    // Appel à l'endpoint de connexion
-    const response = await $fetch<LoginResponse>(`${apiUrl}auth/login`, {
-      method: 'POST',
-      body: {
-        email: loginForm.value.email,
-        password: loginForm.value.password
-      }
-    })
+    // Ici, vous devez implémenter votre logique de connexion réelle
+    // Par exemple : const response = await $fetch('/api/auth/login', { ... })
 
-    if (response && response.user && response.token) {
-      // Sauvegarder les données de l'utilisateur
-      localStorage.setItem('authUser', JSON.stringify(response.user))
-      
-      // Sauvegarder le token JWT
-      localStorage.setItem('authToken', response.token)
-      
-      // Sauvegarder les données de connexion pour la réutilisation
-      localStorage.setItem('authData', JSON.stringify({
-        user: response.user,
-        token: response.token,
-        loginTime: new Date().toISOString()
-      }))
-
-      // Nettoyer le formulaire
-      loginForm.value.email = ''
-      loginForm.value.password = ''
-      loginForm.value.remember = false
-
-      // Fermer la modal et rediriger
-      showLoginModal.value = false
-      
-      // Redirection vers la page de gestion
-      navigateTo('/subscriber/manage')
-    }
-  } catch (error: any) {
-    console.error('Erreur lors de la connexion:', error)
-    loginError.value = error?.data?.message || 'Email ou mot de passe incorrect'
+    // Si connexion réussie
+    showLoginModal.value = false
+    navigateTo('/subscriber/manage')
+  } catch (error) {
+    loginError.value = 'Email ou mot de passe incorrect'
   } finally {
     isLoggingIn.value = false
   }
 }
+
+// Redirection si pas d'abonnement actif
+onMounted(() => {
+  if (!currentSubscription.value.isActive) {
+    // En production, rediriger vers la page d'abonnement
+    // navigateTo('/subscriber')
+  }
+})
 
 // Formatage de date
 const formatDate = (date: Date | null) => {

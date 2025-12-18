@@ -5,7 +5,7 @@
       'popular': plan.popular,
       'selected': isSelected
     }"
-    @click="$emit('select', plan.id)"
+    @click="selectAndSavePlan"
   >
     <!-- Badge Popular -->
     <div v-if="plan.popular" class="popular-badge">
@@ -21,7 +21,7 @@
         <template v-else>
           <span class="amount">{{ formatPrice(plan.price) }}</span>
           <span class="currency">FCFA</span>
-          <span v-if="plan.period !== 'once' && plan.period !== 'free'" class="period">
+          <span v-if="plan.period && plan.period !== 'once' && plan.period !== 'free'" class="period">
             / {{ getPeriodLabel(plan.period) }}
           </span>
         </template>
@@ -31,9 +31,9 @@
     <!-- Fonctionnalités -->
     <div class="pricing-features">
       <ul>
-        <li v-for="(feature, index) in plan.rawFeatures" :key="index">
+        <li v-for="(feature, index) in plan.features" :key="index">
           <span class="check-icon">✓</span>
-          <span>{{ feature }}</span>
+          <span>{{ feature }} {{ plan.features.length }} </span>
         </li>
       </ul>
     </div>
@@ -54,15 +54,17 @@
 
 <script setup lang="ts">
 interface Plan {
-  id: number
+  id: string
   name: string
   price: number
-  currency: string
-  period: string
-  rawFeatures: string[]
-  color: string
-  popular: boolean
-  icon: string
+  currency?: string
+  period?: string
+  features: string[]
+  color?: string
+  popular?: boolean
+  icon?: string
+  description?: string
+  duration?: number
 }
 
 interface Props {
@@ -74,9 +76,20 @@ const props = withDefaults(defineProps<Props>(), {
   isSelected: false
 })
 
-defineEmits<{
-  select: [planId: number]
+const emit = defineEmits<{
+  select: [planId: string]
 }>()
+
+onMounted(() => {
+   console.log('PricingCard mounted with plan:', props.plan)
+})
+
+const selectAndSavePlan = () => {
+  // Sauvegarder le plan complet dans localStorage
+  localStorage.setItem('selectedPlan', JSON.stringify(props.plan))
+  // Émettre l'événement pour mettre à jour le formulaire
+  emit('select', props.plan.id)
+}
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat('fr-FR').format(price)

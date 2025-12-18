@@ -1,127 +1,27 @@
 export const useSubscription = () => {
-  // Plans d'abonnement selon le cahier des charges
-  const subscriptionPlans = ref([
-    {
-      id: 1,
-      name: 'Gratuit',
-      nameKey: 'subscription.plans.free.name',
-      price: 0,
-      currency: 'FCFA',
-      period: 'free',
-      periodKey: 'subscription.period.free',
-      features: [
-        'subscription.plans.free.feature1',
-        'subscription.plans.free.feature2'
-      ],
-      rawFeatures: [
-        'Inscription à la newsletter d\'actualités/promotions',
-        'Sans accès au contenu premium'
-      ],
-      color: 'gray',
-      popular: false,
-      icon: '📧',
-      validation: 'Aucune'
-    },
-    {
-      id: 2,
-      name: 'Premium - Mensuel',
-      nameKey: 'subscription.plans.monthly.name',
-      price: 2000,
-      currency: 'FCFA',
-      period: 'month',
-      periodKey: 'subscription.period.month',
-      features: [
-        'subscription.plans.monthly.feature1',
-        'subscription.plans.monthly.feature2'
-      ],
-      rawFeatures: [
-        'Accès à l\'édition du mois en cours',
-        'Envoi du PDF par e-mail'
-      ],
-      color: 'blue',
-      popular: false,
-      icon: '📰',
-      validation: 'Aucune'
-    },
-    {
-      id: 3,
-      name: 'Premium - Achat à l\'Unité',
-      nameKey: 'subscription.plans.single.name',
-      price: 2000,
-      currency: 'FCFA',
-      period: 'once',
-      periodKey: 'subscription.period.once',
-      features: [
-        'subscription.plans.single.feature1',
-        'subscription.plans.single.feature2'
-      ],
-      rawFeatures: [
-        'Achat et accès à une édition spécifique',
-        'Envoi du PDF par e-mail'
-      ],
-      color: 'green',
-      popular: false,
-      icon: '📄',
-      validation: 'Aucune'
-    },
-    {
-      id: 4,
-      name: 'Premium - Annuel',
-      nameKey: 'subscription.plans.annual.name',
-      price: 20000,
-      currency: 'FCFA',
-      period: 'year',
-      periodKey: 'subscription.period.year',
-      features: [
-        'subscription.plans.annual.feature1',
-        'subscription.plans.annual.feature2'
-      ],
-      rawFeatures: [
-        'Accès aux 12 éditions de l\'année',
-        'Envoi automatique du PDF par e-mail chaque mois'
-      ],
-      color: 'purple',
-      popular: true,
-      icon: '⭐',
-      validation: 'Aucune'
-    },
-    {
-      id: 5,
-      name: 'Premium - Étudiant',
-      nameKey: 'subscription.plans.student.name',
-      price: 10000,
-      currency: 'FCFA',
-      period: 'year',
-      periodKey: 'subscription.period.year',
-      features: [
-        'subscription.plans.student.feature1',
-        'subscription.plans.student.feature2',
-        'subscription.plans.student.feature3'
-      ],
-      rawFeatures: [
-        'Accès aux 12 éditions de l\'année au tarif réduit',
-        'Envoi automatique du PDF par e-mail chaque mois',
-      ],
-      color: 'orange',
-      popular: false,
-      icon: '🎓',
-      validation: 'Preuve de statut étudiant (Carte, Certificat de scolarité)',
-      requiresProof: true
-    }
-  ])
+  const config = useRuntimeConfig()
+  const router = useRouter()
 
-  // État de l'abonnement actuel (fake data - SIMULATION ACTIVE)
-  const currentSubscription = ref({
-    isActive: true,
-    plan: subscriptionPlans.value[3], // Premium Annuel
-    startDate: new Date('2024-12-01'),
-    endDate: new Date('2025-12-01'),
-    autoRenew: true
-  })
+  // Plans d'abonnement (données de fallback)
+  const subscriptionPlans = ref<any[]>([])
+  const plansLoading = ref(false)
+  const plansError = ref('')
+
+  // État de l'abonnement actuel
+  const currentSubscription = ref<any>(null)
+  const subscriptionLoading = ref(false)
+  const subscriptionError = ref('')
+
+  // État de vérification d'email
+  const emailCheckLoading = ref(false)
+  const emailCheckError = ref('')
+  const userExists = ref(false)
+  const existingUserData = ref<any>(null)
 
   // État du formulaire
   const subscriptionForm = ref({
-    planId: null as number | null,
+    userId: null as string | null,
+    planId: null as string | null,
     email: '',
     firstName: '',
     lastName: '',
@@ -129,7 +29,8 @@ export const useSubscription = () => {
     phone: '',
     studentProof: null as File | null, // Justificatif étudiant
     acceptTerms: false,
-    newsletter: true
+    newsletter: true,
+    transactionId: '' // ID de transaction pour le paiement
   })
 
   // État du processus
@@ -208,16 +109,445 @@ export const useSubscription = () => {
     years: '10+'
   })
 
-  // Méthodes
-  const selectPlan = (planId: number) => {
-    subscriptionForm.value.planId = planId
+  // Méthodes API
+  /**
+   * Vérifier si un email existe déjà dans le système
+   * Si oui, retourne les données de l'utilisateur existant
+   */
+  const checkEmail = async (email: string) => {
+    emailCheckLoading.value = true
+    emailCheckError.value = ''
+    userExists.value = false
+    existingUserData.value = null
+
+    try {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}auth/check-email?email=${encodeURIComponent(email)}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.exists) {
+        // L'email existe - pré-remplir le formulaire
+        userExists.value = true
+        existingUserData.value = data
+        
+        // Pré-remplir le formulaire avec les données existantes
+        subscriptionForm.value.userId = data.id || null
+        subscriptionForm.value.email = data.email || ''
+        subscriptionForm.value.firstName = data.firstName || ''
+        subscriptionForm.value.lastName = data.lastName || ''
+        subscriptionForm.value.phone = data.phone || ''
+        
+        console.log('Utilisateur existant trouvé:', data)
+        return { exists: true, user: data }
+      } else {
+        // L'email n'existe pas - nouvel utilisateur
+        userExists.value = false
+        existingUserData.value = null
+        console.log('Email non trouvé - nouvel utilisateur')
+        return { exists: false }
+      }
+    } catch (error) {
+      emailCheckError.value = 'Erreur lors de la vérification de l\'email'
+      console.error('Erreur checkEmail:', error)
+      return { exists: false, error: true }
+    } finally {
+      emailCheckLoading.value = false
+    }
+  }
+
+  /**
+   * Créer un nouveau compte utilisateur
+   */
+  const registerUser = async (email: string, password: string, firstName: string, lastName: string, phone: string) => {
+    isProcessing.value = true
+    errorMessage.value = ''
+
+    try {
+      const payload = {
+        email,
+        password,
+        firstName,
+        lastName,
+        phone
+      }
+
+      const response = await fetch(`${config.public.apiSubcriptionUrl}auth/register`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // L'API retourne { user, token } en cas de succès
+      if (data.user) {
+        // Utilisateur créé avec succès
+        console.log('Utilisateur créé avec succès:', data.user)
+        
+        // Stocker le token si nécessaire
+        if (data.token) {
+          localStorage.setItem('auth_token', data.token)
+        }
+        
+        // Pré-remplir automatiquement le formulaire
+        subscriptionForm.value.userId = data.user.id || null
+        subscriptionForm.value.email = data.user.email || email
+        subscriptionForm.value.firstName = data.user.firstName || firstName
+        subscriptionForm.value.lastName = data.user.lastName || lastName
+        subscriptionForm.value.phone = data.user.phone || phone
+
+        return { success: true, user: data.user, token: data.token }
+      } else {
+        throw new Error(data.message || 'Erreur lors de la création du compte')
+      }
+    } catch (error: any) {
+      errorMessage.value = error.message || 'Erreur lors de la création du compte'
+      console.error('Erreur registerUser:', error)
+      return { success: false, error: error.message }
+    } finally {
+      isProcessing.value = false
+    }
+  }
+
+  /**
+   * Parser les features JSON si nécessaire
+   */
+  const parseFeatures = (features: any): string[] => {
+    if (Array.isArray(features)) {
+      return features
+    }
+    if (typeof features === 'string') {
+      try {
+        return JSON.parse(features)
+      } catch (e) {
+        console.warn('Impossible de parser les features:', features)
+        return []
+      }
+    }
+    return []
+  }
+
+  /**
+   * Normaliser un plan pour l'utilisation dans l'application
+   */
+  const normalizePlan = (plan: any) => {
+    return {
+      ...plan,
+      price: parseFloat(String(plan.price)) || 0,
+      features: parseFeatures(plan.features),
+      duration: parseInt(String(plan.duration)) || 30
+    }
+  }
+
+  /**
+   * Récupérer tous les plans disponibles
+   */
+  const fetchPlans = async () => {
+    plansLoading.value = true
+    plansError.value = ''
+    
+    try {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}plans`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      
+      // L'API retourne { data: [...], meta: {...} }
+      const plans = data.data || data
+      
+      // Normaliser les plans (parser les features JSON, convertir les prix, etc.)
+      subscriptionPlans.value = Array.isArray(plans) 
+        ? plans.map(normalizePlan)
+        : []
+      
+      return subscriptionPlans.value
+    } catch (error) {
+      plansError.value = 'Erreur lors du chargement des plans'
+      console.error('Erreur fetchPlans:', error)
+      return []
+    } finally {
+      plansLoading.value = false
+    }
+  }
+
+  /**
+   * Récupérer un plan spécifique
+   */
+  const fetchPlan = async (planId: string | number) => {
+    try {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}plans/${planId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      const plan = data.data || data
+      
+      // Normaliser le plan
+      return normalizePlan(plan)
+    } catch (error) {
+      console.error('Erreur fetchPlan:', error)
+      return null
+    }
+  }
+
+  /**
+   * Créer un nouvel abonnement
+   */
+  const createSubscription = async (subscriptionData: any) => {
+
+    // return console.log(subscriptionData)
+    isProcessing.value = true
+    errorMessage.value = ''
+    processingStep.value = 'payment'
+    
+    try {
+      const formData = new FormData()
+      
+      // Ajouter les données du formulaire
+      if (subscriptionForm.value.userId) {
+        formData.append('userId', subscriptionForm.value.userId)
+      }
+      formData.append('email', subscriptionForm.value.email)
+      formData.append('firstName', subscriptionForm.value.firstName)
+      formData.append('lastName', subscriptionForm.value.lastName)
+      formData.append('company', subscriptionForm.value.company || '')
+      formData.append('phone', subscriptionForm.value.phone || '')
+      formData.append('planId', String(subscriptionForm.value.planId))
+      formData.append('newsletter', String(subscriptionForm.value.newsletter))
+      
+      // ✅ Utiliser le transactionId passé en paramètre ou depuis subscriptionData
+      const txId = subscriptionData?.transactionId || subscriptionForm.value.transactionId || ''
+      formData.append('transactionId', txId)
+      console.log('📤 TransactionID envoyé à l\'API:', txId)
+      
+      
+      // Ajouter le justificatif étudiant si applicable
+      if (subscriptionForm.value.studentProof) {
+        formData.append('studentProof', subscriptionForm.value.studentProof)
+      }
+      
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions`, {
+        method: 'POST',
+        body: formData
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Erreur createSubscription:', errorData?.error)
+        throw new Error(errorData.error || `Une erreur est survenue, réessayez!`)
+      }
+      
+      const data = await response.json()
+      
+      processingStep.value = 'confirmation'
+      currentSubscription.value = data.data || data
+      
+      return true
+    } catch (error: any) {
+      errorMessage.value = error.message || 'Erreur lors de la création de l\'abonnement'
+      console.error('Erreur createSubscription:', error)
+      return false
+    } finally {
+      isProcessing.value = false
+    }
+  }
+
+  /**
+   * Récupérer l'abonnement actuel de l'utilisateur
+   */
+  const fetchCurrentSubscription = async (userId?: string) => {
+    subscriptionLoading.value = true
+    subscriptionError.value = ''
+    
+    try {
+      const url = userId 
+        ? `${config.public.apiSubcriptionUrl}subscriptions/user/${userId}`
+        : `${config.public.apiSubcriptionUrl}subscriptions/current`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Pas d'abonnement trouvé
+          currentSubscription.value = null
+          return null
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      currentSubscription.value = data.data || data
+      
+      return currentSubscription.value
+    } catch (error) {
+      subscriptionError.value = 'Erreur lors du chargement de votre abonnement'
+      console.error('Erreur fetchCurrentSubscription:', error)
+      currentSubscription.value = null
+      return null
+    } finally {
+      subscriptionLoading.value = false
+    }
+  }
+
+  /**
+   * Renouveler un abonnement
+   */
+  const renewSubscription = async (subscriptionId: string, paymentData?: any) => {
+    isProcessing.value = true
+    errorMessage.value = ''
+    
+    try {
+      const payload = {
+        ...paymentData
+      }
+      
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions/${subscriptionId}/renew`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      currentSubscription.value = data.data || data
+      
+      return true
+    } catch (error: any) {
+      errorMessage.value = error.message || 'Erreur lors du renouvellement de l\'abonnement'
+      console.error('Erreur renewSubscription:', error)
+      return false
+    } finally {
+      isProcessing.value = false
+    }
+  }
+
+  /**
+   * Annuler un abonnement
+   */
+  const cancelSubscriptionAPI = async (subscriptionId: string) => {
+    isProcessing.value = true
+    errorMessage.value = ''
+    
+    try {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions/${subscriptionId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      currentSubscription.value = data.data || data
+      
+      return true
+    } catch (error: any) {
+      errorMessage.value = error.message || 'Erreur lors de l\'annulation de l\'abonnement'
+      console.error('Erreur cancelSubscriptionAPI:', error)
+      return false
+    } finally {
+      isProcessing.value = false
+    }
+  }
+
+  /**
+   * Mettre à jour un abonnement
+   */
+  const updateSubscription = async (subscriptionId: string, updateData: any) => {
+    isProcessing.value = true
+    errorMessage.value = ''
+    
+    try {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions/${subscriptionId}`, {
+        method: 'PUT',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      currentSubscription.value = data.data || data
+      
+      return true
+    } catch (error: any) {
+      errorMessage.value = error.message || 'Erreur lors de la mise à jour de l\'abonnement'
+      console.error('Erreur updateSubscription:', error)
+      return false
+    } finally {
+      isProcessing.value = false
+    }
+  }
+
+  // Méthodes utilitaires
+  const selectPlan = (planId: string | number) => {
+    subscriptionForm.value.planId = String(planId)
     const plan = subscriptionPlans.value.find(p => p.id === planId)
     console.log('Plan sélectionné:', plan?.name)
   }
 
   const getSelectedPlan = computed(() => {
     if (!subscriptionForm.value.planId) return null
-    return subscriptionPlans.value.find(p => p.id === subscriptionForm.value.planId)
+    return subscriptionPlans.value.find(p => String(p.id) === subscriptionForm.value.planId)
   })
 
   const validateForm = (): boolean => {
@@ -251,39 +581,12 @@ export const useSubscription = () => {
       return false
     }
 
-    isProcessing.value = true
-    processingStep.value = 'payment'
-
-    try {
-      // Simulation de traitement du paiement
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      processingStep.value = 'confirmation'
-      
-      // Mise à jour de l'abonnement (fake)
-      const plan = getSelectedPlan.value
-      if (plan) {
-        currentSubscription.value = {
-          isActive: true,
-          plan: plan,
-          startDate: new Date(),
-          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // +30 jours
-          autoRenew: true
-        }
-      }
-
-      return true
-    } catch (error) {
-      errorMessage.value = 'Une erreur est survenue lors du traitement de votre paiement'
-      console.error('Erreur:', error)
-      return false
-    } finally {
-      isProcessing.value = false
-    }
+    return await createSubscription(subscriptionForm.value)
   }
 
   const resetForm = () => {
     subscriptionForm.value = {
+      userId: null,
       planId: null,
       email: '',
       firstName: '',
@@ -292,7 +595,8 @@ export const useSubscription = () => {
       phone: '',
       studentProof: null,
       acceptTerms: false,
-      newsletter: true
+      newsletter: true,
+      transactionId: ''
     }
     processingStep.value = 'form'
     errorMessage.value = ''
@@ -313,19 +617,12 @@ export const useSubscription = () => {
   }
 
   const cancelSubscription = async () => {
-    isProcessing.value = true
-    try {
-      // Simulation d'annulation
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      currentSubscription.value.isActive = false
-      currentSubscription.value.autoRenew = false
-      return true
-    } catch (error) {
-      errorMessage.value = 'Erreur lors de l\'annulation'
+    if (!currentSubscription.value?.id) {
+      errorMessage.value = 'Aucun abonnement actif trouvé'
       return false
-    } finally {
-      isProcessing.value = false
     }
+
+    return await cancelSubscriptionAPI(currentSubscription.value.id)
   }
 
   return {
@@ -336,21 +633,42 @@ export const useSubscription = () => {
     testimonials,
     faqs,
     stats,
+    existingUserData,
+    
+    // Loading & Error states
+    plansLoading,
+    plansError,
+    subscriptionLoading,
+    subscriptionError,
+    emailCheckLoading,
+    emailCheckError,
     
     // States
     isProcessing,
     processingStep,
     errorMessage,
+    userExists,
     
     // Computed
     getSelectedPlan,
     
-    // Methods
+    // Methods - Utilities
     selectPlan,
     validateForm,
-    processSubscription,
     resetForm,
     formatPrice,
-    cancelSubscription
+    
+    // Methods - API
+    fetchPlans,
+    fetchPlan,
+    fetchCurrentSubscription,
+    createSubscription,
+    processSubscription,
+    renewSubscription,
+    cancelSubscriptionAPI,
+    updateSubscription,
+    cancelSubscription,
+    checkEmail,
+    registerUser
   }
 }
