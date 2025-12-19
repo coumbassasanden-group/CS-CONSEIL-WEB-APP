@@ -21,8 +21,8 @@
         <template v-else>
           <span class="amount">{{ formatPrice(plan.price) }}</span>
           <span class="currency">FCFA</span>
-          <span v-if="plan.period && plan.period !== 'once' && plan.period !== 'free'" class="period">
-            / {{ getPeriodLabel(plan.period) }}
+          <span v-if="plan.duration && plan.id === 'e5e96924-1045-4315-9257-c7cc7e11532c'" class="period">
+            / {{ getPeriodLabel(plan.duration?.toString()) }}
           </span>
         </template>
       </div>
@@ -33,7 +33,7 @@
       <ul>
         <li v-for="(feature, index) in plan.features" :key="index">
           <span class="check-icon">✓</span>
-          <span>{{ feature }} {{ plan.features.length }} </span>
+          <span>{{ feature }}  </span>
         </li>
       </ul>
     </div>
@@ -97,10 +97,8 @@ const formatPrice = (price: number) => {
 
 const getPeriodLabel = (period: string) => {
   const labels: Record<string, string> = {
-    'month': 'mois',
-    'year': 'an',
-    'once': '',
-    'free': ''
+    '30': 'mois',
+    '365': 'an',
   }
   return labels[period] || period
 }

@@ -277,36 +277,44 @@
         <div class="plan-card-summary">
           <div class="plan-header">
             <h3>{{ (selectedPlanDetails || getSelectedPlan).name }}</h3>
-            <span class="plan-price">{{ formatPrice((selectedPlanDetails || getSelectedPlan).price) }}/mois</span>
+            <span v-if="selectedPlanDetails?.id !== freePlan" class="plan-price">
+              {{ formatPrice((selectedPlanDetails || getSelectedPlan).price) }}/mois
+            </span>
+            <span v-else style="color: var(--cs-brown-color); font: bold;" class="plan-price">
+              Accès limité à l’intégralité de la revue
+            </span>
           </div>
           
           <p class="plan-description">{{ (selectedPlanDetails || getSelectedPlan).description }}</p>
           
           <div class="plan-details-summary">
-            <div v-if="(selectedPlanDetails || getSelectedPlan).duration" class="detail">
-              <span class="label">Durée:</span>
-              <span class="value">{{ (selectedPlanDetails || getSelectedPlan).duration }} jours</span>
-            </div>
+            
+            
             <div class="detail">
-              <span class="label">Email:</span>
-              <!-- existingUserData -->
-              <span class="value">{{ subscriptionForm.email }}  </span>
+              <span class="label">Nom:</span>
+              <span class="value">{{ subscriptionForm.firstName }} {{ subscriptionForm.lastName }}</span>
             </div>
             <div v-if="subscriptionForm.userId" class="detail">
               <span class="label">Téléphone:</span>
               <span class="value"> {{ subscriptionForm.phone }} </span>
             </div>
             <div class="detail">
-              <span class="label">Nom:</span>
-              <span class="value">{{ subscriptionForm.firstName }} {{ subscriptionForm.lastName }}</span>
+              <span class="label">Email:</span>
+              <!-- existingUserData -->
+              <span class="value">{{ subscriptionForm.email }}  </span>
             </div>
+            <div v-if="(selectedPlanDetails || getSelectedPlan).duration" class="detail">
+              <span class="label">Durée:</span>
+              <span class="value">{{ (selectedPlanDetails || getSelectedPlan).duration }} jours</span>
+            </div>
+            
           </div>
 
           <div style="margin-block: 1rem;" class="features-summary">
             <h4>Ce plan inclut:</h4>
-            <ul>
-              <li v-for="(feature, i) in (selectedPlanDetails || getSelectedPlan).features" :key="i">
-                ✓ {{ feature }}
+            <ul style="list-style:none" >
+              <li  v-for="(feature, i) in (selectedPlanDetails || getSelectedPlan).features" :key="i">
+                 {{ feature }}
               </li>
             </ul>
           </div>
@@ -326,11 +334,52 @@
         {{ errorMessage }}
       </div>
 
+      <!-- selectionnez votre numéro -->
+      <div v-if="selectedPlanDetails?.id === monthlyPlan" class="article-selection-section">
+        <div class="selection-header">
+          <h3> <Icon icon="material-symbols:news-rounded" width="24" height="24" /> Sélectionnez le numéro d'article</h3>
+          <p class="selection-subtitle">Choisissez l'édition ALT News que vous souhaitez acheter</p>
+          <span class="required-badge">Obligatoire</span>
+        </div>
+
+        <div class="articles-grid">
+          <div
+            v-for="article in availableArticles"
+            :key="article.id"
+            class="article-option"
+            :class="{ selected: selectedArticle === article.id }"
+            @click="selectedArticle = article.id"
+            
+          >
+            <div class="article-radio">
+              <input
+                type="radio"
+                :id="`article-${article.id}`"
+                :value="article.id"
+                v-model="selectedArticle"
+                :required="selectedPlanDetails?.id === monthlyPlan"
+              />
+            </div>
+            <div class="article-info">
+              <h4>{{ article.number }}</h4>
+              <p class="article-date"><Icon icon="clarity:date-solid" width="24" height="24" />  {{ article.date }}</p>
+            </div>
+           
+          </div>
+        </div>
+
+        <!-- Validation error -->
+        <div v-if="selectedPlanDetails?.id === monthlyPlan && !selectedArticle" class="alert alert-error mt-3">
+          ⚠️ Veuillez sélectionner un numéro d'article pour continuer
+        </div>
+      </div>
+      <!-- selectionnez votre numéro -->
+
       <!-- Bouton de finalisation -->
       <div class="button-group mt-4">
         <button
           @click="handleCreateSubscription"
-          :disabled="isProcessing"
+          :disabled="isProcessing || (selectedPlanDetails?.id === monthlyPlan && !selectedArticle)"
           class="btn btn-primary btn-lg"
         >
           <span v-if="isProcessing">Création de l'abonnement...</span>
@@ -383,7 +432,7 @@
     :first-name="subscriptionForm.firstName"
     :last-name="subscriptionForm.lastName"
     :user-name="subscriptionForm.firstName + ' ' + subscriptionForm.lastName"
-    :amount="100"
+    :amount="(selectedPlanDetails || getSelectedPlan)?.price || 0"
     :email="subscriptionForm.email"
     :phone="subscriptionForm.phone"
     :structure="'CS-CONSEIL'"
@@ -397,13 +446,25 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSubscription } from '~/composables/useSubscription'
 import Cinetpay from '~/components/Cinetpay.vue'
-
+import {Icon} from "@iconify/vue"
 
 const router = useRouter()
 const cinetpayRef = ref<InstanceType<typeof Cinetpay> | null>(null)
 const isPaying = ref(false)
+const freePlan = ref("a4b34a9f-95e2-447b-9d9f-73028853f2fb")
+const monthlyPlan = ref("e4609624-47af-4147-a701-396ef6130542")
 
 const transactionId = `TXN_altnews_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+// Articles disponibles pour les abonnements mensuels
+const availableArticles = ref([
+  { id: 'dec-2025', number: 'Décembre 2025', date: '15 Décembre 2025' },
+  { id: 'nov-2025', number: 'Novembre 2025', date: '15 Novembre 2025' },
+  { id: 'oct-2025', number: 'Octobre 2025', date: '15 Octobre 2025' },
+  { id: 'sep-2025', number: 'Septembre 2025', date: '15 Septembre 2025' },
+  { id: 'aug-2025', number: 'Août 2025', date: '15 Août 2025' },
+  { id: 'jul-2025', number: 'Juillet 2025', date: '15 Juillet 2025' }
+])
 
 const {
   // Méthodes
@@ -439,6 +500,7 @@ const password = ref('')
 const originalUserData = ref<any>(null)
 const selectedPlanBeforeAuth = ref<string | null>(null)
 const selectedPlanDetails = ref<any>(null)
+const selectedArticle = ref<string | null>(null)
 
 // Charger les plans au montage
 onMounted(() => {
@@ -622,7 +684,15 @@ const goBackToProfile = () => {
  */
 const completeSubscription = async () => {
   console.log('📝 Finalisation de l\'abonnement après paiement...')
-  const success = await createSubscription({...subscriptionForm.value, transactionId})
+  const subscriptionData = {...subscriptionForm.value, transactionId}
+  
+  // Ajouter l'article sélectionné si c'est un plan mensuel
+  if (selectedPlanDetails.value?.id === monthlyPlan.value && selectedArticle.value) {
+    (subscriptionData as any).articleNumber = selectedArticle.value
+    console.log('📰 Article sélectionné:', selectedArticle.value)
+  }
+  
+  const success = await createSubscription(subscriptionData)
   if (success) {
     console.log('✅ Abonnement créé avec succès!')
     router.push('/subscriber/success')
@@ -636,7 +706,13 @@ const completeSubscription = async () => {
  * Étape 4: Déclencher le paiement Cinetpay
  */
 const handleCreateSubscription = async () => {
-  console.log('🔘 Bouton de paiement cliqué...')
+  
+  if(subscriptionForm.value.planId === freePlan.value){
+    return completeSubscription()
+  }
+
+  // return completeSubscription()
+  console.log('🔘 Bouton de paiement cliqué...') 
   
   // Vérifier que le composant Cinetpay est prêt
   if (!cinetpayRef.value) {
@@ -948,6 +1024,11 @@ const handleFinish = () => {
   text-transform: uppercase;
   margin-bottom: 0.25rem;
   margin-right: 1rem;
+}
+
+.detail{
+  display: flex;
+  gap: 12px
 }
 
 .plan-details .value {
@@ -1299,6 +1380,127 @@ const handleFinish = () => {
   color: #6b7280;
   font-size: 0.95rem;
   margin-bottom: 1.5rem;
+}
+
+/* ========== ARTICLE SELECTION STYLING ========== */
+.article-selection-section {
+  background: linear-gradient(135deg, #fef7f0 0%, #fef3e7 100%);
+  border: 2px solid #f5d7b8;
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 2rem 0;
+}
+
+.selection-header {
+  margin-bottom: 1.5rem;
+  text-align: center;
+  position: relative;
+}
+
+.selection-header h3 {
+  font-size: 1.3rem;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+  font-weight: 700;
+}
+
+.selection-subtitle {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin: 0.5rem 0 1rem 0;
+}
+
+.required-badge {
+  display: inline-block;
+  background-color: #dc2626;
+  color: white;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.articles-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.article-option {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.article-option:hover {
+  border-color: var(--cs-brown-color, #8b5c2e);
+  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.1);
+  transform: translateX(4px);
+}
+
+.article-option.selected {
+  border-color: var(--cs-brown-color, #8b5c2e);
+  background: linear-gradient(135deg, #fef7f0 0%, #fef3e7 100%);
+  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.2);
+}
+
+.article-radio {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.article-radio input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.article-option.selected .article-radio::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: var(--cs-brown-color, #8b5c2e);
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.article-info {
+  flex: 1;
+  margin-left: 0.5rem;
+}
+
+.article-info h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.article-date {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.article-price {
+  text-align: right;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--cs-brown-color, #8b5c2e);
 }
 
 /* ========== UTILITIES ========== */

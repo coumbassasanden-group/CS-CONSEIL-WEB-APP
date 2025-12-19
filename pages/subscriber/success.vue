@@ -112,100 +112,18 @@
       </div>
     </div>
 
-    <!-- Modal de connexion -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="showLoginModal" class="login-modal-overlay" @click.self="showLoginModal = false">
-          <div class="login-modal">
-            <div class="modal-header">
-              <h3>Connexion à votre compte</h3>
-              <button class="btn-close" @click="showLoginModal = false" type="button">
-                <span>×</span>
-              </button>
-            </div>
-
-            <div class="modal-body">
-              <form @submit.prevent="handleLogin">
-                <div class="form-group">
-                  <label for="email">Email</label>
-                  <input
-                    id="email"
-                    v-model="loginForm.email"
-                    type="email"
-                    placeholder="votre@email.com"
-                    required
-                    class="form-input"
-                  />
-                </div>
-
-                <div class="form-group">
-                  <label for="password">Mot de passe</label>
-                  <input
-                    id="password"
-                    v-model="loginForm.password"
-                    type="password"
-                    placeholder="Votre mot de passe"
-                    required
-                    class="form-input"
-                  />
-                </div>
-
-                <div class="form-group-checkbox">
-                  <label class="checkbox-label">
-                    <input
-                      v-model="loginForm.remember"
-                      type="checkbox"
-                      class="checkbox-input"
-                    />
-                    <span>Se souvenir de moi</span>
-                  </label>
-                  <a href="#" class="forgot-link">Mot de passe oublié ?</a>
-                </div>
-
-                <div v-if="loginError" class="error-message">
-                  {{ loginError }}
-                </div>
-
-                <button
-                  type="submit"
-                  class="btn-login"
-                  :disabled="isLoggingIn"
-                >
-                  <span v-if="isLoggingIn" class="spinner"></span>
-                  <span v-else>Se connecter</span>
-                </button>
-              </form>
-
-              <div class="modal-footer">
-                <p>Pas encore de compte ? <a href="/subscriber" class="register-link">S'inscrire</a></p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <!-- Composant Modal de connexion -->
+    <LoginModal v-model="showLoginModal" @login-success="handleLoginSuccess" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useSubscription } from '~/composables/useSubscription'
-import { Icon } from "@iconify/vue";
-// Type pour la réponse de connexion
-interface LoginResponse {
-  user: {
-    id: string
-    email: string
-    firstName: string
-    lastName: string
-    phone: string | null
-    role: string
-    isActive: boolean
-    createdAt: string
-    updatedAt: string
-  }
-  token: string
-}
+import { Icon } from "@iconify/vue"
+import LoginModal from '~/components/LoginModal.vue'
+
+// Types
 
 const {
   currentSubscription,
@@ -214,13 +132,6 @@ const {
 
 // État de la modal de connexion
 const showLoginModal = ref(false)
-const isLoggingIn = ref(false)
-const loginError = ref('')
-const loginForm = ref({
-  email: '',
-  password: '',
-  remember: false
-})
 
 // Récupérer les données d'abonnement depuis localStorage
 const subscriptionData = ref<any>({
@@ -269,58 +180,14 @@ onMounted(() => {
   }
 })
 
-// Gestion de la connexion
-const handleLogin = async () => {
-  loginError.value = ''
-  isLoggingIn.value = true
-
-  try {
-    const config = useRuntimeConfig()
-    const apiUrl = config.public.apiSubcriptionUrl || 'http://localhost:3001/api/'
-
-    // Appel à l'endpoint de connexion
-    const response = await $fetch<LoginResponse>(`${apiUrl}auth/login`, {
-      method: 'POST',
-      body: {
-        email: loginForm.value.email,
-        password: loginForm.value.password
-      }
-    })
-
-    if (response && response.user && response.token) {
-      // Sauvegarder les données de l'utilisateur
-      localStorage.setItem('authUser', JSON.stringify(response.user))
-      
-      // Sauvegarder le token JWT
-      localStorage.setItem('authToken', response.token)
-      
-      // Sauvegarder les données de connexion pour la réutilisation
-      localStorage.setItem('authData', JSON.stringify({
-        user: response.user,
-        token: response.token,
-        loginTime: new Date().toISOString()
-      }))
-
-      // Nettoyer le formulaire
-      loginForm.value.email = ''
-      loginForm.value.password = ''
-      loginForm.value.remember = false
-
-      // Fermer la modal et rediriger
-      showLoginModal.value = false
-      
-      // Redirection vers la page de gestion
-      navigateTo('/subscriber/manage')
-    }
-  } catch (error: any) {
-    console.error('Erreur lors de la connexion:', error)
-    loginError.value = error?.data?.message || 'Email ou mot de passe incorrect'
-  } finally {
-    isLoggingIn.value = false
-  }
+// Gestion du succès de connexion
+const handleLoginSuccess = (user: any) => {
+  console.log('✅ Utilisateur connecté:', user.email)
+  // La redirection est gérée par le composant LoginModal
+  // On peut ajouter ici d'autres actions si nécessaire
 }
 
-// Formatage de date
+// Fonction de formatage de date
 const formatDate = (date: Date | null) => {
   if (!date) return 'N/A'
   return new Date(date).toLocaleDateString('fr-FR', {
@@ -766,243 +633,5 @@ useHead({
 }
 
 /* Modal de connexion */
-.login-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 1rem;
-}
-
-.login-modal {
-  background: white;
-  border-radius: 20px;
-  max-width: 450px;
-  width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.login-modal .modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 2rem 2rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.login-modal .modal-header h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1f2937;
-  margin: 0;
-}
-
-.btn-close {
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: #f3f4f6;
-  border-radius: 50%;
-  font-size: 1.8rem;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
-.btn-close:hover {
-  background: #e5e7eb;
-  color: #1f2937;
-}
-
-.login-modal .modal-body {
-  padding: 2rem;
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-group label {
-  display: block;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 0.5rem;
-  font-size: 0.95rem;
-}
-
-.form-input {
-  width: 100%;
-  padding: 0.875rem 1rem;
-  border: 2px solid #e5e7eb;
-  border-radius: 10px;
-  font-size: 1rem;
-  transition: all 0.2s ease;
-  background: #f9fafb;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--cs-brown-color);
-  background: white;
-  box-shadow: 0 0 0 3px rgba(139, 92, 46, 0.1);
-}
-
-.form-group-checkbox {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-  color: #4b5563;
-}
-
-.checkbox-input {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--cs-brown-color);
-}
-
-.forgot-link {
-  color: var(--cs-brown-color);
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 600;
-  transition: opacity 0.2s ease;
-}
-
-.forgot-link:hover {
-  opacity: 0.8;
-}
-
-.error-message {
-  background: #fee2e2;
-  color: #dc2626;
-  padding: 0.875rem 1rem;
-  border-radius: 10px;
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-login {
-  width: 100%;
-  padding: 1rem 2rem;
-  border: none;
-  border-radius: 12px;
-  font-size: 1.05rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: var(--cs-brown-color);
-  color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.btn-login:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 46, 0.4);
-  opacity: 0.9;
-}
-
-.btn-login:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.login-modal .modal-footer {
-  text-align: center;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
-  margin-top: 1.5rem;
-}
-
-.login-modal .modal-footer p {
-  color: #6b7280;
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-.register-link {
-  color: var(--cs-brown-color);
-  text-decoration: none;
-  font-weight: 600;
-  transition: opacity 0.2s ease;
-}
-
-.register-link:hover {
-  opacity: 0.8;
-}
-
-/* Animation de la modal */
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-active .login-modal,
-.modal-leave-active .login-modal {
-  transition: transform 0.3s ease;
-}
-
-.modal-enter-from .login-modal,
-.modal-leave-to .login-modal {
-  transform: scale(0.9);
-}
+/* Les styles de la modal sont maintenant dans LoginModal.vue */
 </style>

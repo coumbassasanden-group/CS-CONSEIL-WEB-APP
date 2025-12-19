@@ -53,7 +53,7 @@
     </section>
 
     <!-- FAQ Section -->
-    <section class="faq-section">
+    <section class="d-none faq-section">
       <div class="container-small">
         <div class="section-header">
           <h2 class="section-title">Questions fréquentes</h2>

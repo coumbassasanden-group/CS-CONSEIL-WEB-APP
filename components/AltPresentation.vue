@@ -1,21 +1,35 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useApi } from '~/composables/useApi'
+import LoginModal from '~/components/LoginModal.vue'
+import SubscriptionCompo from '~/components/SubscriptionCompo.vue'
+
 const { get } = useApi()
 const texts = ref<string[]>([])
-const isLoading = ref(true);
-const isSubcribe = ref(false);
+const isLoading = ref(true)
+const isSubcribe = ref(false)
+const showLoginModal = ref(false)
 
+// Gestion de l'abonnement
 const handleSubscribe = () => {
-    isSubcribe.value = true
+  isSubcribe.value = true
+}
+
+// Gestion du succès de connexion
+const handleLoginSuccess = (user: any) => {
+  console.log('✅ Utilisateur connecté depuis AltPresentation:', user.email)
+  // La redirection est gérée par LoginModal
+  // On peut ajouter d'autres actions ici si nécessaire
 }
 
 onMounted(async () => {
-    try {
-        texts.value = await get<string[]>('/api/texts/alt_presentation')
-    } catch (error) {
-        console.error('Error fetching alt presentation texts:', error)
-    } finally {
-        isLoading.value = false
-    }
+  try {
+    texts.value = await get<string[]>('/api/texts/alt_presentation')
+  } catch (error) {
+    console.error('Error fetching alt presentation texts:', error)
+  } finally {
+    isLoading.value = false
+  }
 })
 </script>
 
@@ -30,7 +44,7 @@ onMounted(async () => {
             </span>
             <div class="container">
                 <div class="row">
-                    <div class="col-lg-6">
+                    <div class="col-lg-8">
                         <div class="tp-chose-wrapper pb-50">
                             <!-- Skeleton Loading pour la colonne gauche -->
                             <div v-if="isLoading" class="tp-chose-list mb-45">
@@ -44,13 +58,20 @@ onMounted(async () => {
                             <!-- Contenu réel -->
                             <div v-else class="tp-chose-list mb-45 wow img-custom-anim-right" v-if="texts.length >= 2">
                                 <h2 class="form-title">La revue mensuelle ALT NEWS</h2>
+                                <h5 class="text-black" >La Revue ALT NEWS évolue vers une version premium, abonnez-vous et
+restez informer des nouvelles parutions.</h5>
                                 <div class="text-center">
                                     <button @click="handleSubscribe"  class="subscribe-button">S'abonner</button>
+                                    <!-- <p class="text-center mt-3">
+                                        <small>Vous avez déjà un compte ? 
+                                            <button @click="showLoginModal = true" class="link-button">Connectez-vous ici</button>
+                                        </small>
+                                    </p> -->
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-lg-6">
+                    <div class="col-lg-4">
                         <!-- Skeleton Loading pour la colonne droite -->
                         <div v-if="isLoading" class="tp-chose-content">
                             <div class="skeleton-text skeleton-text-md mb-25"></div>
@@ -82,10 +103,17 @@ onMounted(async () => {
                                     </svg>
                                 </span>
                             </div>
+
+                             <div style="position: relative; ">
+                                    <button 
+                                    style="position: absolute; left: 6rem !important; background-color: none !important;" 
+                                    @click="showLoginModal = true"  class="login-button"> Accéder à mon espace  </button>
+                              </div>
                         </div>
                     </div>
                 </div>
-                <subscription-compo v-if="isSubcribe" ></subscription-compo>
+                <subscription-compo v-if="isSubcribe"></subscription-compo>
+                <LoginModal v-model="showLoginModal" @login-success="handleLoginSuccess" />
             </div>
         </div>
     </section>
@@ -171,5 +199,36 @@ onMounted(async () => {
     border-radius: 50px;
     margin-top: 1rem;
     padding: 1rem 2rem;
+}
+
+.login-button{
+    background-color: none !important;
+    box-shadow: 0 4px 15px #d4b1284d;
+    color: var(--cs-brown-color);
+    cursor: pointer !important;
+    font-weight: 700;
+    overflow: hidden !important;
+    position: relative !important;
+    text-decoration: none !important;
+    transition: all .3s ease !important;
+    border: 2px solid var(--cs-brown-color) !important;
+    border-radius: 50px;
+    margin-top: 2px;
+    padding: 1rem 2rem;
+}
+
+.link-button {
+    background: none;
+    border: none;
+    color: var(--cs-brown-color);
+    cursor: pointer;
+    font-weight: 700;
+    padding: 0;
+    text-decoration: underline;
+    transition: color 0.3s ease;
+}
+
+.link-button:hover {
+    color: var(--cs-gold-color);
 }
 </style>
