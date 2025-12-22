@@ -57,7 +57,7 @@
     <!-- ========== ÉTAPE 2A: UTILISATEUR EXISTANT ========== -->
     <section v-if="currentStep === 'existing-user' && userExists" class="step existing-user-step">
       <div class="step-header">
-        <h2>Bienvenue de retour! 👋</h2>
+        <h2>Bienvenue de retour!</h2>
         <p>Nous avons retrouvé votre profil</p>
       </div>
 
@@ -88,10 +88,10 @@
       <!-- Actions -->
       <div class="button-group">
         <button @click="proceedToPlans" class="btn btn-primary btn-lg">
-          ✓ C'est correct, continuer
+          C'est correct, continuer
         </button>
         <button @click="editProfile" class="btn btn-secondary">
-          ✎ Modifier ces informations
+          Modifier vous informations
         </button>
       </div>
     </section>
@@ -251,7 +251,7 @@
             class="btn btn-primary btn-lg"
           >
             <span v-if="isProcessing">Enregistrement...</span>
-            <span v-else>✓ Enregistrer les modifications</span>
+            <span v-else>Enregistrer les modifications</span>
           </button>
           <button
             type="button"
@@ -278,41 +278,42 @@
           <div class="plan-header">
             <h3>{{ (selectedPlanDetails || getSelectedPlan).name }}</h3>
             <span v-if="selectedPlanDetails?.id !== freePlan" class="plan-price">
-              {{ formatPrice((selectedPlanDetails || getSelectedPlan).price) }}/mois
+              {{ formatPrice((selectedPlanDetails || getSelectedPlan).price) }}/ {{ getSelectedPlan.id === monthlyPlan ? 'édition' : 'an' }}
             </span>
+            
             <span v-else style="color: var(--cs-brown-color); font: bold;" class="plan-price">
-              Accès limité à l’intégralité de la revue
+              Accès limité à l’intégralité des revues
             </span>
           </div>
           
-          <p class="plan-description">{{ (selectedPlanDetails || getSelectedPlan).description }}</p>
+          <!-- <p class="plan-description">{{ (selectedPlanDetails || getSelectedPlan).description }}</p> -->
           
           <div class="plan-details-summary">
             
             
             <div class="detail">
-              <span class="label">Nom:</span>
+              <span class="label">Nom :</span>
               <span class="value">{{ subscriptionForm.firstName }} {{ subscriptionForm.lastName }}</span>
             </div>
             <div v-if="subscriptionForm.userId" class="detail">
-              <span class="label">Téléphone:</span>
+              <span class="label">Téléphone :</span>
               <span class="value"> {{ subscriptionForm.phone }} </span>
             </div>
             <div class="detail">
-              <span class="label">Email:</span>
+              <span class="label">Email :</span>
               <!-- existingUserData -->
               <span class="value">{{ subscriptionForm.email }}  </span>
             </div>
-            <div v-if="(selectedPlanDetails || getSelectedPlan).duration" class="detail">
-              <span class="label">Durée:</span>
+            <div v-if="(selectedPlanDetails || getSelectedPlan).period > 0" class="detail">
+              <span class="label">Durée :</span>
               <span class="value">{{ (selectedPlanDetails || getSelectedPlan).duration }} jours</span>
             </div>
             
           </div>
 
           <div style="margin-block: 1rem;" class="features-summary">
-            <h4>Ce plan inclut:</h4>
-            <ul style="list-style:none" >
+            <h4>Avantages : </h4>
+            <ul style="" >
               <li  v-for="(feature, i) in (selectedPlanDetails || getSelectedPlan).features" :key="i">
                  {{ feature }}
               </li>
@@ -321,13 +322,7 @@
         </div>
       </div>
 
-      <!-- Newsletter checkbox -->
-      <div class="form-group mt-4">
-        <label>
-          <input v-model="subscriptionForm.newsletter" type="checkbox" />
-          M'envoyer la newsletter
-        </label>
-      </div>
+      
 
       <!-- Affichage des erreurs -->
       <div v-if="errorMessage" class="alert alert-error mt-3">
@@ -337,12 +332,18 @@
       <!-- selectionnez votre numéro -->
       <div v-if="selectedPlanDetails?.id === monthlyPlan" class="article-selection-section">
         <div class="selection-header">
-          <h3> <Icon icon="material-symbols:news-rounded" width="24" height="24" /> Sélectionnez le numéro d'article</h3>
+          <h3> <Icon icon="material-symbols:news-rounded" width="24" height="24" /> Sélectionnez l'édition</h3>
           <p class="selection-subtitle">Choisissez l'édition ALT News que vous souhaitez acheter</p>
           <span class="required-badge">Obligatoire</span>
         </div>
+          <div  class="empty-articles">
 
-        <div class="articles-grid">
+          
+            <h3>Aucune édition disponible pour le moment</h3>
+            <p>Les prochaines éditions seront disponibles bientôt ici.</p>
+</div>
+
+        <!-- <div class="articles-grid">
           <div
             v-for="article in availableArticles"
             :key="article.id"
@@ -366,12 +367,12 @@
             </div>
            
           </div>
-        </div>
+        </div> -->
 
         <!-- Validation error -->
-        <div v-if="selectedPlanDetails?.id === monthlyPlan && !selectedArticle" class="alert alert-error mt-3">
-          ⚠️ Veuillez sélectionner un numéro d'article pour continuer
-        </div>
+        <!-- <div v-if="selectedPlanDetails?.id === monthlyPlan && !selectedArticle" class="alert alert-error mt-3">
+          ⚠️ Veuillez sélectionner une édition pour continuer
+        </div> -->
       </div>
       <!-- selectionnez votre numéro -->
 
@@ -383,7 +384,7 @@
           class="btn btn-primary btn-lg"
         >
           <span v-if="isProcessing">Création de l'abonnement...</span>
-          <span v-else>✓ Finaliser mon abonnement</span>
+          <span v-else>Finaliser mon abonnement</span>
         </button>
       </div>
     </section>
@@ -706,8 +707,8 @@ const completeSubscription = async () => {
  * Étape 4: Déclencher le paiement Cinetpay
  */
 const handleCreateSubscription = async () => {
-  
-  if(subscriptionForm.value.planId === freePlan.value){
+
+ if(subscriptionForm.value.planId === freePlan.value){
     return completeSubscription()
   }
 
@@ -732,7 +733,7 @@ const handleCreateSubscription = async () => {
   console.log('💳 Déclenchement du paiement Cinetpay...')
   
   // ✨ APPEL DIRECT À checkout() avec callback
-  cinetpayRef.value?.checkout(completeSubscription)
+   cinetpayRef.value?.checkout(completeSubscription)
 }
 
 /**
@@ -841,6 +842,24 @@ const handleFinish = () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
+}
+
+.empty-articles {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.empty-articles .empty-icon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.empty-articles h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
 }
 
 /* ========== BUTTON STYLING ========== */

@@ -13,9 +13,9 @@
 
       <!-- Contenu -->
       <div class="success-content">
-        <h1 class="success-title"> Bienvenue chez ALT News !</h1>
+        <h1 class="success-title"> Bienvenue dans ALT News !</h1>
         <p class="success-message">
-          Votre abonnement a été activé avec succès. Vous pouvez maintenant profiter de tous nos contenus exclusifs.
+          Votre abonnement a été activé avec succès.
         </p>
 
         <!-- Résumé de l'abonnement -->
@@ -33,7 +33,7 @@
               </div>
             </div>
 
-            <div class="summary-details">
+            <div  v-if="subscriptionData.plan?.period > 0" class="summary-details">
               <div class="detail-row">
                 <span class="detail-label">Montant</span>
                 <span class="detail-value">
@@ -72,13 +72,7 @@
               <p>Un email de confirmation avec tous les détails vous a été envoyé.</p>
             </div>
            
-            <div class="step-card">
-              <div class="step-icon">
-                <Icon icon="mdi:bell" />
-              </div>
-              <h4>Activez les notifications</h4>
-              <p>Restez informé des dernières actualités en temps réel.</p>
-            </div>
+           
           </div>
         </div>
 
@@ -94,21 +88,7 @@
         </div>
 
         <!-- Aide -->
-        <div class="help-section">
-          <p class="help-text">
-            Une question ? Notre équipe est là pour vous aider.
-          </p>
-          <div class="help-links">
-            <NuxtLink to="/contact" class="help-link">
-              <span class="help-icon">💬</span>
-              <span>Contactez-nous</span>
-            </NuxtLink>
-            <NuxtLink to="/faq" class="help-link">
-              <span class="help-icon">❓</span>
-              <span>FAQ</span>
-            </NuxtLink>
-          </div>
-        </div>
+        
       </div>
     </div>
 

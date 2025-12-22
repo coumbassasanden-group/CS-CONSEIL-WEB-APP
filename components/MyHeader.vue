@@ -238,6 +238,13 @@ onUnmounted(() => {
                                                     {{ $t('header.alt-news') }}
                                                 </NuxtLink>
                                             </li>
+                                            <li>
+                                                <a target="_blank" href=" https://officielimmobilier.net/"
+                                                    rel="noopener noreferrer">
+                                                     Officiel de l'immobilier
+                                                </a>
+                                            </li>
+                                           
                                         </ul>
                                     </nav>
                                 </div>
@@ -471,7 +478,7 @@ onUnmounted(() => {
 /* Navigation - Compact menu */
 .compact-menu {
     display: flex;
-    gap: 0.5rem;
+    gap: 1;
     flex-wrap: nowrap;
 }
 

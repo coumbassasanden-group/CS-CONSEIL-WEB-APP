@@ -39,15 +39,15 @@
                   <p class="meta-value">{{ getAuthUser()?.phone || 'Non fourni' }}</p>
                 </div>
               </div>
-              <div class="meta-item">
+              <!-- <div class="meta-item">
                 <span class="meta-icon">
                   <Icon icon="mdi:user" />
                 </span>
-                <div>
+                <div >
                   <p class="meta-label">Rôle</p>
                   <p class="meta-value">{{ getAuthUser()?.role || 'Abonné' }}</p>
                 </div>
-              </div>
+              </div> -->
               <div class="meta-item">
                 <span class="meta-icon">✅</span>
                 <div>
@@ -87,24 +87,24 @@
                   <span class="info-label"><Icon icon="mdi:calendar" /> Date de début</span>
                   <span class="info-value">{{ formatDate(subscriptionData.startDate) }}</span>
                 </div>
-                <div class="info-item">
+                <div v-if="subscriptionData.plan?.duration > 0" class="info-item">
                   <span class="info-label"><Icon icon="mdi:calendar-clock" /> Prochain paiement</span>
                   <span class="info-value">{{ formatDate(subscriptionData.endDate) }}</span>
                 </div>
-                <div class="info-item">
+                <!-- <div v-if="subscriptionData.plan?.duration > 0" class="info-item">
                   <span class="info-label">⚙️ Renouvellement</span>
                   <span class="info-value">
                     <span v-if="subscriptionData.autoRenew" class="badge-success">Automatique</span>
                     <span v-else class="badge-warning">Désactivé</span>
                   </span>
-                </div>
+                </div> -->
               </div>
             </div>
 
             <div class="card-footer">
-              <h3 class="features-title">Inclus dans votre plan :</h3>
+              <h3 class="features-title">Avantage(s):</h3>
               <ul class="features-list">
-                <li v-for="(feature, index) in subscriptionData.plan?.rawFeatures" :key="index">
+                <li v-for="(feature, index) in subscriptionData.plan?.features" :key="index">
                   <span class="check-icon">✓</span>
                   <span>{{ feature }}</span>
                 </li>
@@ -122,7 +122,7 @@
                 <span v-else>🔄 Renouveler l'abonnement</span>
               </button>
               <button 
-                v-else 
+                v-if="subscriptionData.plan?.period > 0"
                 @click="handleToggleAutoRenew" 
                 class="btn-toggle-renew"
                 :disabled="isTogglingRenew"
@@ -158,7 +158,7 @@
 
         <div class="articles-section">
           <div class="section-header">
-            <h2>Mes articles ALT News</h2>
+            <h2>Les éditions ALT News</h2>
             <p>Éditions disponibles avec votre abonnement {{ subscriptionData.plan?.name }}</p>
           </div>
 
@@ -166,14 +166,14 @@
             <div class="spinner-large"></div>
             <p>Chargement de vos articles...</p>
           </div>
-
-          <div v-else-if="userArticles.length === 0" class="empty-articles">
-            <span class="empty-icon">📰</span>
-            <h3>Aucun article disponible pour le moment</h3>
-            <p>Les prochaines éditions seront disponibles ici.</p>
+          <!-- v-else-if="userArticles.length === 0" -->
+          <div  class="empty-articles">
+            <span class="empty-icon"></span>
+            <h3>Aucune édition disponible pour le moment</h3>
+            <p>Les prochaines éditions seront disponibles bientôt ici.</p>
           </div>
 
-          <div v-else class="articles-grid">
+          <!-- <div v-else class="articles-grid">
             <div 
               v-for="article in userArticles" 
               :key="article.id"
@@ -212,7 +212,7 @@
                 </div>
               </div>
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
 

@@ -25,7 +25,7 @@ export default defineNuxtConfig({
   ],
 
   app: {
-    baseURL: '/dev_alt-news',
+    // baseURL: '/dev_alt-news',
     // buildAssetsDir: '/next-coumbassa-sanden/',
     // head: {
     //   script: [
