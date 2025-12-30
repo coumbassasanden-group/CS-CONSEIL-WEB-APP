@@ -156,7 +156,64 @@
           </div>
         </div>
 
-        <div class="articles-section">
+        <!-- ========== TOGGLE BUTTONS ========== -->
+        <div class="toggle-buttons-section">
+          <!-- Toggle 1: Notifications -->
+          <div class="toggle-card">
+            <div class="toggle-content">
+              <div class="toggle-info">
+                <span class="toggle-icon">🔔</span>
+                <div class="toggle-text">
+                  <h4>Editions gratuites</h4>
+                  <p>Recevez des alertes pour les nouvelles éditions</p>
+                </div>
+              </div>
+              <label class="toggle-switch">
+                <input 
+                  v-model="notificationsEnabled" 
+                  type="checkbox"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+      
+          </div>
+
+          <!-- Toggle 2: Newsletter -->
+          <div class="toggle-card">
+            <div class="toggle-content">
+              <div class="toggle-info">
+                <span class="toggle-icon">📬</span>
+                <div class="toggle-text">
+                  <h4>Editions exclusives</h4>
+                  <p>Recevez nos contenus exclusifs par email</p>
+                </div>
+              </div>
+              <label class="toggle-switch">
+                <input 
+                  v-model="newsletterEnabled" 
+                  type="checkbox"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+            
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="no-subscription">
+        <div class="empty-state">
+          <span class="empty-icon">📭</span>
+          <h2>Aucun abonnement actif</h2>
+          <p>Vous n'avez pas encore d'abonnement ALT News</p>
+          <NuxtLink to="/subscriber" class="btn-primary">
+            Découvrir nos offres
+          </NuxtLink>
+        </div>
+      </div>
+      <!-- free news -->
+      <div v-if="notificationsEnabled" class="articles-section">
           <div class="section-header">
             <h2>Les éditions ALT News</h2>
             <p>Éditions disponibles avec votre abonnement {{ subscriptionData.plan?.name }}</p>
@@ -213,19 +270,85 @@
               </div>
             </div>
           </div> -->
-        </div>
       </div>
 
-      <div v-else class="no-subscription">
-        <div class="empty-state">
-          <span class="empty-icon">📭</span>
-          <h2>Aucun abonnement actif</h2>
-          <p>Vous n'avez pas encore d'abonnement ALT News</p>
-          <NuxtLink to="/subscriber" class="btn-primary">
-            Découvrir nos offres
-          </NuxtLink>
+      <!-- subscriber news -->
+      <div v-if="newsletterEnabled" class="">
+
+        <div v-if="loading" class="row">
+                  <div class="col-12 text-center py-5">
+                      <div class="spinner-container">
+                          <div class="spinner">
+                              <div class="spinner-inner"></div>
+                          </div>
+                          <p class="mt-3 fs-5 text-muted">{{ $t('alt_news.loading') }}</p>
+                      </div>
+                  </div>
         </div>
-      </div>
+    
+              <!-- Error State -->
+        <div v-else-if="error" class="row">
+                  <div class="col-12">
+                      <div class="error-container text-center py-5">
+                          <div class="error-icon mb-3">
+                              <i class="fa-solid fa-circle-exclamation fs-1 text-danger"></i>
+                          </div>
+                          <h3 class="text-danger">{{ $t('alt_news.error.title') }}</h3>
+                          <p class="text-muted mb-4">{{ error }}</p>
+                          <button @click="fetchAltNews" class="btn btn-primary">
+                              <i class="fa-solid fa-rotate me-2"></i>{{ $t('alt_news.error.retry') }}
+                          </button>
+                      </div>
+                  </div>
+        </div>
+    
+              
+    
+              <!-- Alt News List -->
+        <div v-else class="row">
+                  <div v-for="(news, index) in altNews" :key="news.id" class="col-lg-4 col-md-6">
+                      <div class="tp-service-2-wrap p-relative fix mb-30 wow fadeInLeft"
+                          :data-wow-delay="`${0.3 + (index * 0.1)}s`" data-wow-duration=".9s">
+                          <div class="tp-service-2-thumb tp-round-4">
+                              <img class="w-100 tp-round-4" :src="`${config.public.apiBaseUrl}/storage/${news.image}`"
+                                  :alt="news.title">
+                          </div>
+                          <div class="tp-service-2-content p-absolute">
+                              <div class="tp-service-2-content-top d-flex align-items-center">
+                                  <span v-if="String(news?.title).match(/\d+/g)" class="mr-10 p-3 rounded-3 text-light cs-bg-purple fw-700 fs-5">
+                                      #{{ String(news?.title).match(/\d+/g)?.[0] }}
+                                  </span>
+                                  <button 
+                                    class="fw-500 fs-25 ls-m-2 cs-text-dark news-link-btn"
+                                    @click="openNewsModal(news)"
+                                  >
+                                      {{ news.title }}
+                                  </button>
+                              </div>
+                              <div class="tp-service-2-content-bottom pt-20">
+                                  <span class="cs-text-dark cs-ff-montserrat fw-700 cs-ff-poppins">
+                                      {{ formatDate(news.date) }}
+                                  </span>
+                              </div>
+                          </div>
+                          <!-- <div class="date p-2 text-center p-absolute">
+                              
+                          </div> -->
+                      </div>
+                  </div>
+    
+                  <!-- Empty State -->
+                  <div v-if="altNews.length === 0" class="col-12 text-center py-5">
+                      <div class="empty-state">
+                          <i class="fa-regular fa-folder-open fs-1 text-muted mb-3"></i>
+                          <h4 class="text-muted">{{ $t('alt_news.empty.title') }}</h4>
+                          <p class="text-muted">{{ $t('alt_news.empty.description') }}</p>
+                      </div>
+                  </div>
+        </div>
+     </div>
+      <!-- Loading State -->
+
     </div>
 
     <PaymentAlert
@@ -270,15 +393,64 @@
       @close="showSuccessModal = false"
       @confirm="showSuccessModal = false"
     />
+
+    <!-- News Modal -->
+    <NewsModal 
+      v-model="showNewsModal"
+      :news="selectedNews"
+      @view-articles="handleViewArticles"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useSubscription } from '~/composables/useSubscription'
 import { useAuth } from '~/composables/useAuth'
 import { useRoute, navigateTo } from '#app'
 import { Icon } from "@iconify/vue";
+
+import { useI18n } from 'vue-i18n';
+import type { TNews } from '~/type';
+
+const config = useRuntimeConfig();
+const { locale } = useI18n();
+const { formatDate } = useFormatDate()
+const localePath = useLocalePath();
+const altNews = ref<TNews[]>([]);
+const loading = ref(true);
+const error = ref(null);
+
+const fetchAltNews = async () => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+        const response = await fetch(`${config.public.apiBaseUrl}/api/alt-news`, {
+            method: 'GET',
+            headers: {
+                'Accept-Language': locale.value,
+                'company': 'conseil'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        altNews.value = await response.json();
+    } catch (err: { message?: string } | any) {
+        console.error('Error fetching alt news:', err);
+        error.value = err?.message || 'Failed to load alt news';
+    } finally {
+        loading.value = false;
+    }
+};
+
+onMounted(() => {
+    fetchAltNews();
+});
+
 
 
 // Appliquer le middleware d'authentification
@@ -306,6 +478,23 @@ const isTogglingRenew = ref(false)
 const isLoadingArticles = ref(true)
 const downloadingId = ref<number | null>(null)
 const isLoading = ref(true)
+const notificationsEnabled = ref(false)
+const newsletterEnabled = ref(true)
+const showNewsModal = ref(false)
+const selectedNews = ref<any>(null)
+
+// Watchers pour les toggles mutuellement exclusifs
+watch(notificationsEnabled, (newVal) => {
+  if (newVal) {
+    newsletterEnabled.value = false
+  }
+})
+
+watch(newsletterEnabled, (newVal) => {
+  if (newVal) {
+    notificationsEnabled.value = false
+  }
+})
 
 const userArticles = ref([
   {
@@ -350,14 +539,6 @@ const userArticles = ref([
   }
 ])
 
-const formatDate = (date: Date | null) => {
-  if (!date) return 'N/A'
-  return new Date(date).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  })
-}
 
 // Charger les données d'abonnement depuis localStorage
 const subscriptionData = ref<any>({
@@ -480,6 +661,17 @@ const handleCancelSubscription = async () => {
   } finally {
     isRenewing.value = false
   }
+}
+
+const openNewsModal = (news: any) => {
+  selectedNews.value = news
+  showNewsModal.value = true
+}
+
+const handleViewArticles = (newsId: number | string) => {
+  console.log('Affichage des articles pour :', newsId)
+  // Ici vous pouvez ajouter une redirection ou charger les articles
+  navigateTo(localePath({ name: 'alt-news-id', params: { id: newsId } }))
 }
 
 
@@ -1251,5 +1443,194 @@ useHead({
   font-size: 1.1rem;
   color: #666;
   font-weight: 500;
+}
+
+/* ========== TOGGLE BUTTONS STYLING ========== */
+.toggle-buttons-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin: 3rem 0;
+}
+
+.toggle-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border: 2px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.toggle-card:hover {
+  box-shadow: 0 8px 30px rgba(139, 92, 46, 0.15);
+  border-color: var(--cs-brown-color);
+  transform: translateY(-5px);
+}
+
+.toggle-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.toggle-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.toggle-icon {
+  font-size: 2.5rem;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fef7f0 0%, #fef3e7 100%);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.toggle-text h4 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+}
+
+.toggle-text p {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Toggle Switch Styling */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #e5e7eb;
+  transition: all 0.3s ease;
+  border-radius: 34px;
+  border: 2px solid transparent;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 2px;
+  background-color: white;
+  transition: all 0.3s ease;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+input:checked + .slider {
+  background-color: var(--cs-brown-color);
+  border-color: var(--cs-brown-color);
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 0 3px rgba(139, 92, 46, 0.1);
+}
+
+/* Toggle Status */
+.toggle-status {
+  text-align: center;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.status-active {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: #d1fae5;
+  color: #059669;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.status-inactive {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .toggle-buttons-section {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .toggle-content {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .toggle-info {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .toggle-switch {
+    margin: 0 auto;
+  }
+}
+
+/* News Modal Button Styling */
+.news-link-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.news-link-btn:hover {
+  color: white;
+  text-decoration: underline;
 }
 </style>

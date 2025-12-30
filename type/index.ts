@@ -375,3 +375,11 @@ export interface RegisterResponse {
   message?: string
   error?: string
 }
+
+
+export type TNews = {
+  date: string;
+  id: number;
+  image: string;
+  title: string;
+}
