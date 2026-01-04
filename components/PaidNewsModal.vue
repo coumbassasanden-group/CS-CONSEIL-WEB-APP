@@ -5,7 +5,7 @@
         <div class="modal-content">
           <!-- Header avec bouton fermeture -->
           <div class="modal-header">
-            <h2 class="modal-title">{{ news?.title }}</h2>
+            <h2 class="modal-title">{{ news?.frTitle || news?.enTitle || 'Article' }}</h2>
             <button class="modal-close-btn" @click="closeModal" aria-label="Fermer">
               <span>✕</span>
             </button>
@@ -13,7 +13,7 @@
 
           <!-- Body du modal avec le composant detailNew -->
           <div class="modal-body">
-            <detailNew v-if="news?.id" :id="news.id" />
+            <detailNew v-if="news?.id" :id="news.id" is-paid />
           </div>
 
         </div>
@@ -24,35 +24,43 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { TNews, TSubscriptionData } from '~/type';
+import type { TSubscriptionData } from '~/type'
 
-interface NewsItem {
+interface PaidNewsItem {
   id: number | string
-  title: string
-  image?: string
-  date?: string
+  frTitle?: string
+  enTitle?: string
+  frContent?: string
+  enContent?: string
+  imageUrl?: string
+  publishedAt?: string
+  status?: string
 }
 
 const props = defineProps<{
   modelValue: boolean
-  news: NewsItem | null
-  isPay?: boolean
+  news: PaidNewsItem | null
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  'view-articles': [newsId: number | string]
-  
+  'download': [newsId: number | string]
+  'share': [newsId: number | string]
 }>()
 
 const closeModal = () => {
   emit('update:modelValue', false)
 }
 
-const handleViewArticles = () => {
+const handleDownload = () => {
   if (props.news?.id) {
-    emit('view-articles', props.news.id)
-    closeModal()
+    emit('download', props.news.id)
+  }
+}
+
+const handleShare = () => {
+  if (props.news?.id) {
+    emit('share', props.news.id)
   }
 }
 </script>
@@ -154,87 +162,58 @@ const handleViewArticles = () => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 .btn-primary {
   background: var(--cs-brown-color);
   color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.3);
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 46, 0.4);
   opacity: 0.9;
+  transform: translateY(-2px);
 }
 
 .btn-secondary {
-  background: #e5e7eb;
-  color: #1f2937;
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
 }
 
 .btn-secondary:hover {
-  background: #d1d5db;
-}
-
-/* Transition animations */
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-from .modal-content {
-  transform: translateY(30px);
-}
-
-.modal-leave-active .modal-content {
-  animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(30px);
-  }
+  background: #e5e7eb;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .modal-content {
-    max-width: 95vw;
+    border-radius: 16px;
     max-height: 95vh;
   }
 
   .modal-header {
     padding: 1.5rem;
-  }
-
-  .modal-body {
-    padding: 1.5rem;
-    gap: 1.5rem;
-  }
-
-  .modal-footer {
-    padding: 1.5rem;
     flex-direction: column;
   }
 
-  .btn-primary,
-  .btn-secondary {
-    width: 100%;
-    justify-content: center;
+  .modal-title {
+    font-size: 1.3rem;
   }
+
+  .modal-body {
+    padding: 1rem;
+  }
+}
+
+/* Transitions */
+.modal-enter-active,
+.modal-leave-active {
+  transition: all 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
 }
 </style>

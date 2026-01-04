@@ -8,8 +8,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBaseUrl: process.env.API_BASE_URL || 'https://nextapi.coumbassa-sanden.com',
-      apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://altnews-sub.altdigit.africa/api/',
-    }
+      apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://altnews-sub.altdigit.africa/api/', //'http://localhost:3001/api/', //, 
+      apiSubcriptionBase: process.env.API_SUBSCRIPTION_BASE || 'https://altnews-sub.altdigit.africa/api/' //'http://localhost:3001'
+     }
     //http://213.199.36.68:5020
   },
 

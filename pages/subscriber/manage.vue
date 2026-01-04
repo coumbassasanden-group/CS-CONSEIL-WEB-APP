@@ -162,7 +162,9 @@
           <div class="toggle-card">
             <div class="toggle-content">
               <div class="toggle-info">
-                <span class="toggle-icon">🔔</span>
+                <span class="toggle-icon">
+                  <Icon icon="mdi:bell" />
+                </span>
                 <div class="toggle-text">
                   <h4>Editions gratuites</h4>
                   <p>Recevez des alertes pour les nouvelles éditions</p>
@@ -183,7 +185,9 @@
           <div class="toggle-card">
             <div class="toggle-content">
               <div class="toggle-info">
-                <span class="toggle-icon">📬</span>
+                <span class="toggle-icon">
+                  <Icon icon="mdi:email-newsletter" />
+                </span>
                 <div class="toggle-text">
                   <h4>Editions exclusives</h4>
                   <p>Recevez nos contenus exclusifs par email</p>
@@ -216,64 +220,69 @@
       <div v-if="notificationsEnabled" class="articles-section">
           <div class="section-header">
             <h2>Les éditions ALT News</h2>
-            <p>Éditions disponibles avec votre abonnement {{ subscriptionData.plan?.name }}</p>
+             <p>Éditions disponibles avec votre l'offre gratuite</p>
           </div>
 
           <div v-if="isLoadingArticles" class="loading-state">
             <div class="spinner-large"></div>
             <p>Chargement de vos articles...</p>
           </div>
-          <!-- v-else-if="userArticles.length === 0" -->
-          <div  class="empty-articles">
+          <!--  -->
+          <div  v-else-if="userArticles.length === 0" class="empty-articles">
             <span class="empty-icon"></span>
             <h3>Aucune édition disponible pour le moment</h3>
             <p>Les prochaines éditions seront disponibles bientôt ici.</p>
           </div>
-
-          <!-- <div v-else class="articles-grid">
-            <div 
-              v-for="article in userArticles" 
-              :key="article.id"
-              class="article-card"
-            >
-              <div class="article-image">
-                <img :src="article.coverImage" :alt="article.title" />
-                <span class="article-badge">{{ article.type }}</span>
-              </div>
-              <div class="article-content">
-                <div class="article-meta">
-                  <span class="article-date">📅 {{ article.date }}</span>
-                  <span class="article-status" :class="article.status">
-                    {{ article.status === 'available' ? 'Disponible' : 'À venir' }}
-                  </span>
-                </div>
-                <h3 class="article-title">{{ article.title }}</h3>
-                <p class="article-excerpt">{{ article.excerpt }}</p>
-                <div class="article-actions">
-                  <button 
-                    v-if="article.status === 'available'" 
-                    @click="downloadArticle(article.id)"
-                    class="btn-download"
-                    :disabled="downloadingId === article.id"
-                  >
-                    <span v-if="downloadingId === article.id" class="spinner-small"></span>
-                    <span v-else>📥 Télécharger PDF</span>
-                  </button>
-                  <button 
-                    v-else
-                    class="btn-coming-soon"
-                    disabled
-                  >
-                    🕐 Bientôt disponible
-                  </button>
-                </div>
-              </div>
+         <!-- articles payants -->
+          <div class="row">
+            <div v-for="(news, index) in altNews" :key="news.id" class="col-lg-4 col-md-6">
+                        <div class="tp-service-2-wrap p-relative fix mb-30 wow fadeInLeft"
+                            :data-wow-delay="`${0.3 + (index * 0.1)}s`" data-wow-duration=".9s">
+                            <div class="tp-service-2-thumb tp-round-4">
+                                <img class="w-100 tp-round-4" :src="`${config.public.apiBaseUrl}/storage/${news.image}`"
+                                    :alt="news.title">
+                            </div>
+                            <div class="tp-service-2-content p-absolute">
+                                <div class="tp-service-2-content-top d-flex align-items-center">
+                                    <span v-if="String(news?.title).match(/\d+/g)" class="mr-10 p-3 rounded-3 text-light cs-bg-purple fw-700 fs-5">
+                                        #{{ String(news?.title).match(/\d+/g)?.[0] }}
+                                    </span>
+                                    <button 
+                                      class="fw-500 fs-25 ls-m-2 cs-text-dark news-link-btn"
+                                      @click="openNewsModal(news, false)"
+                                    >
+                                        {{ news.title }}
+                                    </button>
+                                </div>
+                                <div class="tp-service-2-content-bottom pt-20">
+                                    <span class="cs-text-dark cs-ff-montserrat fw-700 cs-ff-poppins">
+                                        {{ formatDate(news.date) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <!-- <div class="date p-2 text-center p-absolute">
+                                
+                            </div> -->
+                        </div>
             </div>
-          </div> -->
+
+          </div>
+    
+                  <!-- Empty State -->
+                   <div v-if="altNews.length === 0" class="row">
+
+                     <div  class="col-12 text-center py-5">
+                         <div class="empty-state">
+                             <i class="fa-regular fa-folder-open fs-1 text-muted mb-3"></i>
+                             <h4 class="text-muted">{{ $t('alt_news.empty.title') }}</h4>
+                             <p class="text-muted">{{ $t('alt_news.empty.description') }}</p>
+                         </div>
+                     </div>
+                   </div>
       </div>
 
       <!-- subscriber news -->
-      <div v-if="newsletterEnabled" class="">
+      <div v-if="newsletterEnabled" class="articles-section">
 
         <div v-if="loading" class="row">
                   <div class="col-12 text-center py-5">
@@ -306,28 +315,28 @@
     
               <!-- Alt News List -->
         <div v-else class="row">
-                  <div v-for="(news, index) in altNews" :key="news.id" class="col-lg-4 col-md-6">
+                  <div v-for="(news, index) in payAltNews" :key="news.id" class="col-lg-4 col-md-6">
                       <div class="tp-service-2-wrap p-relative fix mb-30 wow fadeInLeft"
                           :data-wow-delay="`${0.3 + (index * 0.1)}s`" data-wow-duration=".9s">
                           <div class="tp-service-2-thumb tp-round-4">
-                              <img class="w-100 tp-round-4" :src="`${config.public.apiBaseUrl}/storage/${news.image}`"
-                                  :alt="news.title">
+                              <img class="w-100 tp-round-4" :src="`${config.public.apiSubcriptionBase}${news.imageUrl}`"
+                                  :alt="news.imageUrl">
                           </div>
                           <div class="tp-service-2-content p-absolute">
                               <div class="tp-service-2-content-top d-flex align-items-center">
-                                  <span v-if="String(news?.title).match(/\d+/g)" class="mr-10 p-3 rounded-3 text-light cs-bg-purple fw-700 fs-5">
-                                      #{{ String(news?.title).match(/\d+/g)?.[0] }}
+                                  <span v-if="String(news?.frTitle).match(/\d+/g)" class="mr-10 p-3 rounded-3 text-light cs-bg-purple fw-700 fs-5">
+                                      #{{ String(news?.frTitle).match(/\d+/g)?.[0] }}
                                   </span>
                                   <button 
                                     class="fw-500 fs-25 ls-m-2 cs-text-dark news-link-btn"
-                                    @click="openNewsModal(news)"
+                                    @click="fetchAlPaytNew(news.id)"
                                   >
-                                      {{ news.title }}
+                                      {{locale === 'fr' ? news.frTitle : news.enTitle }}
                                   </button>
                               </div>
                               <div class="tp-service-2-content-bottom pt-20">
                                   <span class="cs-text-dark cs-ff-montserrat fw-700 cs-ff-poppins">
-                                      {{ formatDate(news.date) }}
+                                      {{ formatDate(news.publishedAt) }}
                                   </span>
                               </div>
                           </div>
@@ -345,6 +354,10 @@
                           <p class="text-muted">{{ $t('alt_news.empty.description') }}</p>
                       </div>
                   </div>
+        </div>
+
+        <div v-if="payAltNews.length === 0" class=""  >
+          <h4 class="text-center" >Vous n'avez pas encore d'éditions premium disponibles pour le moment.</h4>
         </div>
      </div>
       <!-- Loading State -->
@@ -394,11 +407,19 @@
       @confirm="showSuccessModal = false"
     />
 
-    <!-- News Modal -->
+    <!-- News Modal for Free Articles -->
     <NewsModal 
       v-model="showNewsModal"
       :news="selectedNews"
       @view-articles="handleViewArticles"
+    />
+
+    <!-- Paid News Modal for Premium Articles -->
+    <PaidNewsModal 
+      v-model="showPaidNewsModal"
+      :news="payAltNew"
+      @download="handleDownloadPaidArticle"
+      @share="handleSharePaidArticle"
     />
   </div>
 </template>
@@ -411,15 +432,18 @@ import { useRoute, navigateTo } from '#app'
 import { Icon } from "@iconify/vue";
 
 import { useI18n } from 'vue-i18n';
-import type { TNews } from '~/type';
+import type { TNews, TSubscriptionData } from '~/type';
 
 const config = useRuntimeConfig();
 const { locale } = useI18n();
 const { formatDate } = useFormatDate()
 const localePath = useLocalePath();
 const altNews = ref<TNews[]>([]);
+const payAltNews = ref<TSubscriptionData[]>([]);
+const payAltNew = ref<TSubscriptionData | null>(null);
 const loading = ref(true);
 const error = ref(null);
+
 
 const fetchAltNews = async () => {
     loading.value = true;
@@ -481,7 +505,70 @@ const isLoading = ref(true)
 const notificationsEnabled = ref(false)
 const newsletterEnabled = ref(true)
 const showNewsModal = ref(false)
+const showPaidNewsModal = ref(false)
+const showPaidNews = ref(false)
 const selectedNews = ref<any>(null)
+
+const paysParams = new URLSearchParams({userId: getAuthUser()?.id || ''})
+
+const fetchAlPaytNews = async () => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+        const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions?${paysParams.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Accept-Language': locale.value,
+                'company': 'conseil'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const respo = await response.json() as { data: TSubscriptionData[], meta: any };
+        payAltNews.value = respo.data
+    } catch (err: { message?: string } | any) {
+        console.error('Error fetching alt news:', err);
+        error.value = err?.message || 'Failed to load alt news';
+    } finally {
+        loading.value = false;
+    }
+};
+
+const fetchAlPaytNew = async (id: string) => {
+    loading.value = true;
+    error.value = null;
+
+    try {
+        const response = await fetch(`${config.public.apiSubcriptionUrl}news/simple/${id}`, {
+            method: 'GET',
+            headers: {
+                'Accept-Language': locale.value,
+                'company': 'conseil'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+
+        const respo = await response.json() as { data: TSubscriptionData, success: boolean };
+        payAltNew.value = respo.data
+        
+        // Ouvrir le modal payant
+        showPaidNewsModal.value = true
+    } catch (err: { message?: string } | any) {
+        console.error('Error fetching paid news:', err);
+        error.value = err?.message || 'Failed to load paid news';
+    } finally {
+        loading.value = false;
+    }
+};
+
+
 
 // Watchers pour les toggles mutuellement exclusifs
 watch(notificationsEnabled, (newVal) => {
@@ -551,7 +638,7 @@ const subscriptionData = ref<any>({
 
 onMounted(() => {
   isLoading.value = true
-  
+  fetchAlPaytNews()
   // Vérifier la connexion
   if (!isLoggedIn()) {
     console.warn('Utilisateur non connecté, redirection vers success page')
@@ -630,15 +717,6 @@ const handleToggleAutoRenew = async () => {
   }
 }
 
-const downloadArticle = async (articleId: number) => {
-  try {
-    console.log('Téléchargement de l\'article:', articleId)
-    // Simuler le téléchargement
-    await new Promise(resolve => setTimeout(resolve, 1500))
-  } catch (error) {
-    console.error('Erreur lors du téléchargement:', error)
-  }
-}
 
 const handleCancelSubscription = async () => {
   if (!window.confirm('Êtes-vous sûr ? Cette action est irréversible.')) {
@@ -663,8 +741,9 @@ const handleCancelSubscription = async () => {
   }
 }
 
-const openNewsModal = (news: any) => {
+const openNewsModal = (news: any, isPay: boolean) => {
   selectedNews.value = news
+  showPaidNews.value = isPay || false
   showNewsModal.value = true
 }
 
@@ -672,6 +751,33 @@ const handleViewArticles = (newsId: number | string) => {
   console.log('Affichage des articles pour :', newsId)
   // Ici vous pouvez ajouter une redirection ou charger les articles
   navigateTo(localePath({ name: 'alt-news-id', params: { id: newsId } }))
+}
+
+const handleDownloadPaidArticle = (newsId: number | string) => {
+  console.log('Téléchargement de l\'article payant:', newsId)
+  // Logique de téléchargement
+  successMessage.value = {
+    title: 'Téléchargement',
+    message: 'Votre article est en cours de téléchargement...'
+  }
+  showSuccessModal.value = true
+}
+
+const handleSharePaidArticle = (newsId: number | string) => {
+  console.log('Partage de l\'article payant:', newsId)
+  // Logique de partage
+  const shareUrl = `${window.location.origin}${window.location.pathname}?article=${newsId}`
+  
+  // Copier l'URL dans le presse-papiers
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      successMessage.value = {
+        title: 'Lien copié',
+        message: 'Le lien de partage a été copié dans le presse-papiers'
+      }
+      showSuccessModal.value = true
+    })
+  }
 }
 
 

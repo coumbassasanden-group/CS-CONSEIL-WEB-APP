@@ -383,3 +383,14 @@ export type TNews = {
   image: string;
   title: string;
 }
+
+export type TSubscriptionData = {
+  id: string;
+  enTitle: string;
+  frTitle: string;
+  enContent: string;
+  frContent: string;
+  imageUrl: string;
+  publishedAt: string; // ISO string
+  status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+}

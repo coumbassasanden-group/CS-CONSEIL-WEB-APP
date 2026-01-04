@@ -3,7 +3,10 @@
  * Permet d'accéder facilement aux données sauvegardées dans localStorage
  */
 
+
+
 export const useAuth = () => {
+  const config = useRuntimeConfig()
   /**
    * Récupère les données de l'utilisateur connecté
    */

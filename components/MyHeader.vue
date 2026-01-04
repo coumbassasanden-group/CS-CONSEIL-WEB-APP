@@ -115,6 +115,12 @@ onUnmounted(() => {
                                 {{ $t('header.alt-news') }}
                             </NuxtLink>
                         </li>
+                        <li>
+                            <a target="_blank" href=" https://officielimmobilier.net/"
+                            rel="noopener noreferrer">
+                            L'officiel de l'immobilier
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </div>
@@ -241,7 +247,7 @@ onUnmounted(() => {
                                             <li>
                                                 <a target="_blank" href=" https://officielimmobilier.net/"
                                                     rel="noopener noreferrer">
-                                                     Officiel de l'immobilier
+                                                     L'officiel de l'immobilier
                                                 </a>
                                             </li>
                                            

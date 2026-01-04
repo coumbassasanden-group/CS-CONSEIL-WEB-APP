@@ -343,7 +343,7 @@
             <p>Les prochaines éditions seront disponibles bientôt ici.</p>
 </div>
 
-        <!-- <div class="articles-grid">
+        <div class="articles-grid">
           <div
             v-for="article in availableArticles"
             :key="article.id"
@@ -367,7 +367,7 @@
             </div>
            
           </div>
-        </div> -->
+        </div>
 
         <!-- Validation error -->
         <!-- <div v-if="selectedPlanDetails?.id === monthlyPlan && !selectedArticle" class="alert alert-error mt-3">
@@ -454,18 +454,38 @@ const cinetpayRef = ref<InstanceType<typeof Cinetpay> | null>(null)
 const isPaying = ref(false)
 const freePlan = ref("a4b34a9f-95e2-447b-9d9f-73028853f2fb")
 const monthlyPlan = ref("e4609624-47af-4147-a701-396ef6130542")
+const config = useRuntimeConfig()
+const { formatDate } = useFormatDate()
 
 const transactionId = `TXN_altnews_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
+interface AltNews {
+    id: string,
+    publishedAt: string,
+    imageUrl: string,
+    frTitle: string,
+    frContent: string,
+    frIframe: string,
+    frPdfUrl: string,
+    enTitle: string,
+    enContent: string,
+    enIframe: string,
+    enPdfUrl: string | null,
+    status: string,
+    viewCount: number,
+    createdAt: string,
+    updatedAt: string,
+}
+
+interface ArticleOption {
+  id: string
+  number: string
+  date: string
+}
+
 // Articles disponibles pour les abonnements mensuels
-const availableArticles = ref([
-  { id: 'dec-2025', number: 'Décembre 2025', date: '15 Décembre 2025' },
-  { id: 'nov-2025', number: 'Novembre 2025', date: '15 Novembre 2025' },
-  { id: 'oct-2025', number: 'Octobre 2025', date: '15 Octobre 2025' },
-  { id: 'sep-2025', number: 'Septembre 2025', date: '15 Septembre 2025' },
-  { id: 'aug-2025', number: 'Août 2025', date: '15 Août 2025' },
-  { id: 'jul-2025', number: 'Juillet 2025', date: '15 Juillet 2025' }
-])
+const availableArticles = ref<ArticleOption[]>([])
+
 
 const {
   // Méthodes
@@ -503,10 +523,30 @@ const selectedPlanBeforeAuth = ref<string | null>(null)
 const selectedPlanDetails = ref<any>(null)
 const selectedArticle = ref<string | null>(null)
 
+async function handleNews(){
+  try {
+    const response = await fetch(`${config.public.apiSubcriptionUrl}news/all/simple`) 
+    const {data} = await response.json() as {success: boolean, data: AltNews[]}
+    console.log('News data:', data)
+    
+    // Formater les données pour availableArticles
+    if (Array.isArray(data)) {
+      availableArticles.value = data.map((news: AltNews) => ({
+        id: news.id,
+        number: news.frTitle || news.enTitle || 'Edition',
+        date: news.publishedAt ? formatDate(news.publishedAt) : 'Date inconnue'
+      }))
+      console.log('Articles mises à jour:', availableArticles.value)
+    }
+  } catch (error) {
+    console.error('Erreur lors du chargement des articles:', error)
+  }
+}
+
 // Charger les plans au montage
 onMounted(() => {
   fetchPlans()
-  
+  handleNews()
   // Restaurer le plan depuis localStorage s'il existe
   const savedPlan = localStorage.getItem('selectedPlan')
   if (savedPlan) {
@@ -685,7 +725,15 @@ const goBackToProfile = () => {
  */
 const completeSubscription = async () => {
   console.log('📝 Finalisation de l\'abonnement après paiement...')
-  const subscriptionData = {...subscriptionForm.value, transactionId}
+  
+  // Déterminer si l'article doit être inclus (sauf pour le plan gratuit)
+  const subScribeNews = subscriptionForm.value.planId === freePlan.value ? null : selectedArticle.value
+  
+  const subscriptionData = {
+    ...subscriptionForm.value,
+    transactionId,
+    subScribeNews
+  }
   
   // Ajouter l'article sélectionné si c'est un plan mensuel
   if (selectedPlanDetails.value?.id === monthlyPlan.value && selectedArticle.value) {
@@ -707,7 +755,7 @@ const completeSubscription = async () => {
  * Étape 4: Déclencher le paiement Cinetpay
  */
 const handleCreateSubscription = async () => {
-
+//  return completeSubscription()
  if(subscriptionForm.value.planId === freePlan.value){
     return completeSubscription()
   }

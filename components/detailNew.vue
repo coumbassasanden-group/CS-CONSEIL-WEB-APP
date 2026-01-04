@@ -9,16 +9,23 @@ const route = useRoute();
 
 interface AltNews {
     id: number;
-    title: string;
-    date: string;
-    image: string;
-    iFrame: string;
-    pdf: string;
-    content: string;
+    title?: string;
+    frTitle?: string;
+    enTitle?: string;
+    date?: string;
+    publishedAt?: string;
+    image?: string;
+    imageUrl?: string;
+    iFrame?: string;
+    pdf?: string;
+    content?: string;
+    frContent?: string;
+    enContent?: string;
 }
 
 interface Props {
     id?: number | string
+    isPaid?: boolean
 }
 
 const props = defineProps<Props>()
@@ -49,7 +56,17 @@ const fetchAltNewsDetails = async () => {
     error.value = null;
 
     try {
-        const response = await fetch(`${config.public.apiBaseUrl}/api/alt-news/${newsId.value}`, {
+        let url: string
+        
+        if (props.isPaid) {
+            // Pour les articles payants : utiliser l'endpoint /news/simple/{id}
+            url = `${config.public.apiSubcriptionUrl}news/simple/${newsId.value}`
+        } else {
+            // Pour les articles gratuits : utiliser l'endpoint /api/alt-news/{id}
+            url = `${config.public.apiBaseUrl}/api/alt-news/${newsId.value}`
+        }
+
+        const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Accept-Language': locale.value,
@@ -61,8 +78,16 @@ const fetchAltNewsDetails = async () => {
             throw new Error(`HTTP error! Status: ${response.status}`);
         }
 
-        const data = await response.json();
-        altNews.value = data;
+        const responseData = await response.json();
+        
+        // Gérer les deux formats de réponse
+        if (props.isPaid && responseData.data) {
+            // Pour les articles payants, les données sont dans responseData.data
+            altNews.value = responseData.data;
+        } else if (!props.isPaid && responseData) {
+            // Pour les articles gratuits, les données sont directes
+            altNews.value = responseData;
+        }
     } catch (err: any) {
         console.error('Error fetching ALT news details:', err);
         error.value = err.message || 'Failed to load ALT news details';
@@ -70,6 +95,35 @@ const fetchAltNewsDetails = async () => {
         loading.value = false;
     }
 };
+
+// Computed properties pour les champs bilingues
+const newsTitle = computed(() => {
+    if (props.isPaid) {
+        return locale.value === 'fr' ? altNews.value.frTitle : altNews.value.enTitle
+    }
+    return altNews.value.title
+})
+
+const newsContent = computed(() => {
+    if (props.isPaid) {
+        return locale.value === 'fr' ? altNews.value.frContent : altNews.value.enContent
+    }
+    return altNews.value.content
+})
+
+const newsImage = computed(() => {
+    if (props.isPaid && altNews.value.imageUrl) {
+        return `${config.public.apiSubcriptionUrl}${altNews.value.imageUrl}`
+    }
+    if (!props.isPaid && altNews.value.image) {
+        return `${config.public.apiBaseUrl}/storage/${altNews.value.image}`
+    }
+    return ''
+})
+
+const newsDate = computed(() => {
+    return altNews.value.publishedAt || altNews.value.date || ''
+})
 
 const downloadPdf = () => {
     if (altNews.value.pdf) {
@@ -168,7 +222,7 @@ watch(newsId, async () => {
                         <div class="tp-team-details-thumb mb-30 wow img-custom-anim-left" data-wow-duration="1.5s"
                             data-wow-delay="0.2s">
                             <img class="w-100 tp-round-4 shadow-lg" 
-                                 :src="`${config.public.apiBaseUrl}/storage/${altNews.image}`"
+                                 :src="newsImage"
                                  alt="Image ALT News">
                         </div>
                     </div>
@@ -176,14 +230,14 @@ watch(newsId, async () => {
                         <div class="tp-team-details-content mb-30">
                             <h2 class="fw-600 fs-50 ls-m-2 mb-15 wow img-custom-anim-left cs-text-purple cs-ff-montserrat"
                                 data-wow-duration="1.5s" data-wow-delay="0.2s">
-                                {{ altNews.title }}
+                                {{ newsTitle }}
                             </h2>
                             <div class="tp-postbox-meta-item mb-30 d-flex align-items-center">
-                                <span class="cs-text-dark fw-600 fs-18">{{ formatDate(altNews.date) }}</span>
-                                <span v-if="String(altNews.title).match(/\d+/g)" class="cs-badge ms-3">ALT #{{ String(altNews.title).match(/\d+/g)![0] }}</span>
+                                <span class="cs-text-dark fw-600 fs-18">{{ formatDate(newsDate) }}</span>
+                                <span v-if="String(newsTitle).match(/\d+/g)" class="cs-badge ms-3">ALT #{{ String(newsTitle).match(/\d+/g)![0] }}</span>
                             </div>
-                            <div class="mb-40" v-if="altNews.content">
-                                <div v-html="altNews.content"></div>
+                            <div class="mb-40" v-if="newsContent">
+                                <div v-html="newsContent"></div>
                             </div>
                             <span class="fw-600 fs-16 cs-text-gold p-3 border-bottom">Explorer les détails ci-dessous</span>
                         </div>

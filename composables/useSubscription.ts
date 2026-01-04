@@ -30,7 +30,8 @@ export const useSubscription = () => {
     studentProof: null as File | null, // Justificatif étudiant
     acceptTerms: false,
     newsletter: true,
-    transactionId: '' // ID de transaction pour le paiement
+    transactionId: '', // ID de transaction pour le paiement,
+    subScribeNews: ''
   })
 
   // État du processus
@@ -329,7 +330,6 @@ export const useSubscription = () => {
    * Créer un nouvel abonnement
    */
   const createSubscription = async (subscriptionData: any) => {
-
     // return console.log(subscriptionData)
     isProcessing.value = true
     errorMessage.value = ''
@@ -348,6 +348,7 @@ export const useSubscription = () => {
       formData.append('company', subscriptionForm.value.company || '')
       formData.append('phone', subscriptionForm.value.phone || '')
       formData.append('planId', String(subscriptionForm.value.planId))
+      formData.append('subScribeNews', String(subscriptionData?.subScribeNews))
       formData.append('newsletter', String(subscriptionForm.value.newsletter))
       
       // ✅ Utiliser le transactionId passé en paramètre ou depuis subscriptionData
@@ -596,7 +597,8 @@ export const useSubscription = () => {
       studentProof: null,
       acceptTerms: false,
       newsletter: true,
-      transactionId: ''
+      transactionId: '',
+      subScribeNews: ''
     }
     processingStep.value = 'form'
     errorMessage.value = ''

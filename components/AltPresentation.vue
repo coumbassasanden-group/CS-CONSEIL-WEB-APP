@@ -57,9 +57,10 @@ onMounted(async () => {
                             
                             <!-- Contenu réel -->
                             <div v-else class="tp-chose-list mb-45 wow img-custom-anim-right" v-if="texts.length >= 2">
-                                <h2 class="form-title">La revue mensuelle ALT NEWS</h2>
-                                <h5 class="text-black" >La Revue ALT NEWS évolue vers une version premium, abonnez-vous et
-restez informer des nouvelles parutions.</h5>
+                                <h2 class="form-title">La revue mensuelle juridique et fiscale ALT NEWS</h2>
+                                <h5 class="text-black" >
+                                La Revue ALT NEWS évolue vers une version premium. <br> Abonnez-vous et
+restez informé des nouvelles parutions.</h5>
                                 <div class="text-center">
                                     <button @click="handleSubscribe"  class="subscribe-button">S'abonner</button>
                                     <!-- <p class="text-center mt-3">

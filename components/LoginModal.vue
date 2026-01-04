@@ -165,6 +165,9 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 const router = useRouter()
 
+const config = useRuntimeConfig()
+const apiUrl = config.public.apiSubcriptionUrl 
+
 // État - Connexion
 const isLoading = ref(false)
 const error = ref('')
@@ -274,6 +277,13 @@ const handleForgotPassword = async () => {
 
   try {
     console.log('📧 Demande de réinitialisation pour:', forgotForm.value.email)
+
+   const response = await $fetch(`${apiUrl}auth/request-password-change`, {
+      method: 'POST',
+      body: {
+        email: forgotForm.value.email
+      }
+    })
 
     // SIMULATION: Simule un délai d'envoi (500-1500ms)
     await new Promise(resolve => setTimeout(resolve, 800))
