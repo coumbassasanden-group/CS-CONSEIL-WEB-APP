@@ -83,7 +83,27 @@ const fetchAltNewsDetails = async () => {
         // Gérer les deux formats de réponse
         if (props.isPaid && responseData.data) {
             // Pour les articles payants, les données sont dans responseData.data
-            altNews.value = responseData.data;
+            const d = responseData.data
+            // Normaliser les champs pour que la template existante fonctionne
+            altNews.value = {
+                id: d.id,
+                // titres et contenus bruts (garder les champs FR/EN séparés aussi)
+                frTitle: d.frTitle,
+                enTitle: d.enTitle,
+                frContent: d.frContent,
+                enContent: d.enContent,
+                // Champs normalisés utilisés par la template
+                title: locale.value === 'fr' ? d.frTitle || d.enTitle : d.enTitle || d.frTitle,
+                content: locale.value === 'fr' ? d.frContent || d.enContent : d.enContent || d.frContent,
+                // iframe / pdf
+                iFrame: locale.value === 'fr' ? d.frIframe || d.enIframe : d.enIframe || d.frIframe,
+                pdf: locale.value === 'fr' ? d.frPdfUrl || d.enPdfUrl : d.enPdfUrl || d.frPdfUrl,
+                // image and date
+                imageUrl: d.imageUrl,
+                image: d.imageUrl, // keep compatibility (template may expect image)
+                publishedAt: d.publishedAt || d.date,
+                date: d.publishedAt || d.date,
+            }
         } else if (!props.isPaid && responseData) {
             // Pour les articles gratuits, les données sont directes
             altNews.value = responseData;

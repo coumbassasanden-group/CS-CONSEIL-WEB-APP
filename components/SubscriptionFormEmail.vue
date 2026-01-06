@@ -781,7 +781,7 @@ const handleCreateSubscription = async () => {
   console.log('💳 Déclenchement du paiement Cinetpay...')
   
   // ✨ APPEL DIRECT À checkout() avec callback
-   cinetpayRef.value?.checkout(completeSubscription)
+    cinetpayRef.value?.checkout(completeSubscription)
 }
 
 /**

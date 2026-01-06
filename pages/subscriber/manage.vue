@@ -471,6 +471,11 @@ const fetchAltNews = async () => {
     }
 };
 
+// Watcher pour re-charger les articles quand la langue change
+watch(locale, () => {
+    fetchAltNews();
+});
+
 onMounted(() => {
     fetchAltNews();
 });
@@ -537,6 +542,11 @@ const fetchAlPaytNews = async () => {
         loading.value = false;
     }
 };
+
+// Watcher pour re-charger les articles payants quand la langue change
+watch(locale, () => {
+    fetchAlPaytNews();
+});
 
 const fetchAlPaytNew = async (id: string) => {
     loading.value = true;
