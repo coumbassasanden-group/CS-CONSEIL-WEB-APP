@@ -454,6 +454,7 @@ const cinetpayRef = ref<InstanceType<typeof Cinetpay> | null>(null)
 const isPaying = ref(false)
 const freePlan = ref("a4b34a9f-95e2-447b-9d9f-73028853f2fb")
 const monthlyPlan = ref("e4609624-47af-4147-a701-396ef6130542")
+const studentPlan = ref("z4609624-47af-4147-a701-396ef6130542")
 const config = useRuntimeConfig()
 const { formatDate } = useFormatDate()
 
@@ -759,6 +760,11 @@ const handleCreateSubscription = async () => {
  if(subscriptionForm.value.planId === freePlan.value){
     return completeSubscription()
   }
+
+  if(subscriptionForm.value.planId === studentPlan.value){
+    return alert("Le plan étudiant n'est pas encore disponible pour le moment.")
+  }
+  
 
   // return completeSubscription()
   console.log('🔘 Bouton de paiement cliqué...') 

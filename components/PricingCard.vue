@@ -227,8 +227,9 @@ const getPeriodLabel = (period: string) => {
   justify-content: center;
   width: 20px;
   height: 20px;
-  background: #d1fae5;
-  color: #059669;
+  /* replaced green with purple theme */
+  background: #ede9fe; /* light purple */
+  color: #7c3aed; /* brand purple */
   border-radius: 50%;
   font-weight: bold;
   font-size: 0.75rem;
@@ -249,7 +250,7 @@ const getPeriodLabel = (period: string) => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: var(--cs-brown-color);
+  background: var(--cs-gold-color);
   color: white;
   box-shadow: 0 4px 12px rgba(139, 92, 46, 0.3);
 }
