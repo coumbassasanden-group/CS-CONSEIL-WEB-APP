@@ -118,7 +118,7 @@
             </form>
 
             <div class="modal-footer">
-              <p v-if="!showForgotPassword">Pas encore de compte ? <a href="/subscriber" class="register-link">S'inscrire</a></p>
+              <p v-if="!showForgotPassword">Pas encore de compte ? <button type="button" class="register-link" @click="handleRegisterClick">S'inscrire</button></p>
             </div>
           </div>
         </div>
@@ -128,23 +128,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 // Type pour la réponse de connexion
 interface LoginResponse {
-  user: {
+  message: string
+  token: string
+  subscriber: {
     id: string
     email: string
-    firstName: string
-    lastName: string
-    phone: string | null
-    role: string
-    isActive: boolean
-    createdAt: string
-    updatedAt: string
+    first_name: string
+    last_name: string
+    type: string
+    status: string
+    expires_at: string | null
   }
-  token: string
 }
 
 // Props
@@ -156,6 +155,7 @@ interface Props {
 interface Emits {
   (e: 'update:modelValue', value: boolean): void
   (e: 'login-success', user: any): void
+  (e: 'register-click'): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -164,6 +164,14 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 const router = useRouter()
+const route = useRoute()
+
+// Récupérer la locale courante depuis l'URL
+const currentLocale = computed(() => {
+  const pathParts = route.path.split('/')
+  const locale = pathParts[1]
+  return ['fr', 'en'].includes(locale) ? locale : 'fr'
+})
 
 // État - Connexion
 const isLoading = ref(false)
@@ -207,6 +215,11 @@ const resetForm = () => {
   error.value = ''
 }
 
+const handleRegisterClick = () => {
+  close()
+  emit('register-click')
+}
+
 const handleLogin = async () => {
   error.value = ''
   isLoading.value = true
@@ -217,8 +230,8 @@ const handleLogin = async () => {
 
     console.log('🔐 Tentative de connexion avec:', form.value.email)
 
-    // Appel à l'endpoint de connexion
-    const response = await $fetch<LoginResponse>(`${apiUrl}auth/login`, {
+    // Appel à l'endpoint de connexion des abonnés
+    const response = await $fetch<LoginResponse>(`${apiUrl}subscription/auth/login`, {
       method: 'POST',
       body: {
         email: form.value.email,
@@ -226,24 +239,33 @@ const handleLogin = async () => {
       }
     })
 
-    if (response && response.user && response.token) {
-      console.log('✅ Connexion réussie pour:', response.user.email)
+    if (response && response.subscriber && response.token) {
+      console.log('✅ Connexion réussie pour:', response.subscriber.email)
 
-      // Sauvegarder les données de l'utilisateur
-      localStorage.setItem('authUser', JSON.stringify(response.user))
+      // Sauvegarder les données de l'utilisateur (format normalisé)
+      const userData = {
+        id: response.subscriber.id,
+        email: response.subscriber.email,
+        firstName: response.subscriber.first_name,
+        lastName: response.subscriber.last_name,
+        type: response.subscriber.type,
+        status: response.subscriber.status,
+        expiresAt: response.subscriber.expires_at
+      }
+      localStorage.setItem('authUser', JSON.stringify(userData))
 
       // Sauvegarder le token JWT
       localStorage.setItem('authToken', response.token)
 
       // Sauvegarder les données de connexion pour la réutilisation
       localStorage.setItem('authData', JSON.stringify({
-        user: response.user,
+        user: userData,
         token: response.token,
         loginTime: new Date().toISOString()
       }))
 
       // Émettre l'événement de succès
-      emit('login-success', response.user)
+      emit('login-success', userData)
 
       // Nettoyer le formulaire
       resetForm()
@@ -251,10 +273,9 @@ const handleLogin = async () => {
       // Fermer la modal
       isOpen.value = false
 
-      // Redirection vers la page de gestion
-      setTimeout(() => {
-        router.push('/subscriber/manage')
-      }, 500)
+      // Redirection immédiate vers la page de gestion
+      await nextTick()
+      router.push(`/${currentLocale.value}/subscriber/manage`)
     }
   } catch (err: any) {
     console.error('❌ Erreur lors de la connexion:', err)
@@ -266,7 +287,6 @@ const handleLogin = async () => {
 
 /**
  * Gérer la demande de réinitialisation de mot de passe
- * SIMULATION: Simule l'envoi d'email pour le moment
  */
 const handleForgotPassword = async () => {
   forgotError.value = ''
@@ -275,30 +295,29 @@ const handleForgotPassword = async () => {
   try {
     console.log('📧 Demande de réinitialisation pour:', forgotForm.value.email)
 
-    // SIMULATION: Simule un délai d'envoi (500-1500ms)
-    await new Promise(resolve => setTimeout(resolve, 800))
+    const config = useRuntimeConfig()
+    const apiUrl = config.public.apiSubcriptionUrl || 'http://localhost:3001/api/'
 
-    // SIMULATION: Simule un succès (95% de chance)
-    // En production, ceci sera remplacé par l'appel API réel
-    const shouldSucceed = Math.random() < 0.95
+    // Appel à l'API de réinitialisation
+    const response = await $fetch(`${apiUrl}subscription/auth/forgot-password`, {
+      method: 'POST',
+      body: {
+        email: forgotForm.value.email
+      }
+    })
 
-    if (!shouldSucceed) {
-      throw new Error('Email non trouvé dans la base de données')
-    }
+    console.log('✅ Demande de réinitialisation envoyée')
 
-    console.log('✅ [SIMULATION] Email de réinitialisation envoyé à:', forgotForm.value.email)
-    console.log('💡 En production, un email réel serait envoyé avec un lien de réinitialisation')
-    
     // Afficher le message de succès
     forgotSuccess.value = true
 
-    // Redirection automatique après 3 secondes
+    // Redirection automatique après 5 secondes
     setTimeout(() => {
       backToLogin()
-    }, 3000)
+    }, 5000)
   } catch (err: any) {
     console.error('❌ Erreur lors de la demande de réinitialisation:', err)
-    forgotError.value = err?.message || 'Erreur lors de l\'envoi du lien de réinitialisation'
+    forgotError.value = err?.data?.message || 'Erreur lors de l\'envoi du lien de réinitialisation'
   } finally {
     isLoadingForgot.value = false
   }
@@ -339,8 +358,9 @@ const backToLogin = () => {
   border-radius: 20px;
   max-width: 450px;
   width: 100%;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(107, 33, 168, 0.2);
   animation: modalSlideIn 0.3s ease;
+  border: 1px solid rgba(139, 92, 46, 0.1);
 }
 
 @keyframes modalSlideIn {
@@ -359,13 +379,17 @@ const backToLogin = () => {
   justify-content: space-between;
   align-items: center;
   padding: 2rem 2rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 2px solid;
+  border-image: linear-gradient(90deg, #d4b128 0%, #d4b128 100%) 1;
 }
 
 .login-modal .modal-header h3 {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #1f2937;
+  background: #d4b128;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: 0;
 }
 
@@ -418,9 +442,9 @@ const backToLogin = () => {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--cs-brown-color);
+  border-color: #d4b128;
   background: white;
-  box-shadow: 0 0 0 3px rgba(139, 92, 46, 0.1);
+  box-shadow: 0 0 0 3px rgba(107, 33, 168, 0.1);
 }
 
 .form-group-checkbox {
@@ -443,11 +467,11 @@ const backToLogin = () => {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: var(--cs-brown-color);
+  accent-color: #d4b128;
 }
 
 .forgot-link {
-  color: var(--cs-brown-color);
+  color: #d4b128;
   background: none;
   border: none;
   text-decoration: none;
@@ -475,8 +499,8 @@ const backToLogin = () => {
 }
 
 .success-message {
-  background: #dcfce7;
-  color: #16a34a;
+  background: linear-gradient(135deg, #faf5ff 0%, #fef7f0 100%);
+  color: #d4b128;
   padding: 0.875rem 1rem;
   border-radius: 10px;
   margin-bottom: 1.5rem;
@@ -484,7 +508,7 @@ const backToLogin = () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-left: 4px solid #16a34a;
+  border-left: 4px solid #d4b128;
 }
 
 /* ========== FORMULAIRE MOT DE PASSE OUBLIÉ ========== */
@@ -508,7 +532,7 @@ const backToLogin = () => {
 .btn-back {
   background: none;
   border: none;
-  color: var(--cs-brown-color);
+  color: #d4b128;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -527,7 +551,10 @@ const backToLogin = () => {
 .forgot-title {
   font-size: 1.3rem;
   font-weight: 700;
-  color: #1f2937;
+  background: #d4b128;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin: 0.5rem 0 0.5rem 0;
 }
 
@@ -547,9 +574,9 @@ const backToLogin = () => {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: var(--cs-brown-color);
+  background: #d4b128;
   color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.3);
+  box-shadow: 0 4px 12px rgba(107, 33, 168, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -558,8 +585,7 @@ const backToLogin = () => {
 
 .btn-login:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 46, 0.4);
-  opacity: 0.9;
+  box-shadow: 0 6px 20px rgba(107, 33, 168, 0.4);
 }
 
 .btn-login:disabled {
@@ -585,7 +611,8 @@ const backToLogin = () => {
 .login-modal .modal-footer {
   text-align: center;
   padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 2px solid;
+  border-image: linear-gradient(90deg, #d4b128 0%, #d4b128 100%) 1;
   margin-top: 1.5rem;
 }
 
@@ -596,14 +623,20 @@ const backToLogin = () => {
 }
 
 .register-link {
-  color: var(--cs-brown-color);
+  color: #d4b128;
   text-decoration: none;
   font-weight: 600;
   transition: opacity 0.2s ease;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
 }
 
 .register-link:hover {
   opacity: 0.8;
+  text-decoration: underline;
 }
 
 /* Animation de la modal */

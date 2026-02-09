@@ -49,7 +49,7 @@
         "african": {
             "title": "Deeply African#values",
             "description": "We place humanity, solidarity and excellence at the heart of our actions, with strong roots in African realities."
-        }
+        
     },
     "headlines": {
         "title": "Headlines",
@@ -134,8 +134,8 @@
                 "subject_required": "Subject is required",
                 "company_name_required": "Company name is required",
                 "message_too_short": "Message must be at least 10 characters long"
-            }
-        }
+            
+        
     },
     "services": {
         "title": "Our services",
@@ -152,7 +152,7 @@
         "sections": {
             "fiscal": "Tax",
             "legal": "Legal"
-        }
+        
     },
     "events": {
         "title": "Our events",
@@ -186,7 +186,7 @@
         "empty": {
             "title": "No news found",
             "description": "There are currently no news available."
-        }
+        
     },
     "stationery": {
         "title": "Legal",
@@ -207,7 +207,7 @@
             "legal": {
                 "title": "Legal assurance",
                 "description": "Ensure you are always compliant with legal requirements by ordering your registers."
-            }
+            
         },
         "loading": "Loading product details...",
         "error": {
@@ -244,8 +244,8 @@
             "contact": {
                 "title": "Contact us",
                 "phone": "+999 325 654 8596"
-            }
-        }
+            
+        
     },
     "eventDetail": {
         "loading": "Loading event details...",
@@ -261,12 +261,12 @@
             "contact": {
                 "title": "Contact us",
                 "phone": "+999 325 654 8596"
-            }
+            
         },
         "emptyContent": {
             "title": "Content in preparation",
             "description": "The detailed content will be available soon."
-        }
+        
     },
     "hero": {
         "loading": "Loading hero content...",
@@ -282,7 +282,7 @@
         "contact": {
             "description": "Schedule a consultation to discuss your legal needs and goals today",
             "button": "Contact us"
-        }
+        
     },
     "cart": {
         "title": "My Cart",
@@ -306,7 +306,7 @@
         "card2": {
             "title": "Consulting",
             "subtitle": "Tax"
-        }
+        
     },
     "service-description": {
         "years_experience": "Years of experience",
@@ -329,7 +329,9 @@
         "404_message": "The page you are looking for does not exist.",
         "default_message": "We are currently experiencing technical difficulties.",
         "back": "Back"
-    },
+    }
+    
+,
     "subscription": {
         "subtitle": "ALT News Subscriptions",
         "title": "Choose your plan",

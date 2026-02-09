@@ -30,6 +30,13 @@ const newsId = computed(() => {
     return props.id || route.params.id
 })
 
+// Computed pour l'URL de l'image
+const imageUrl = computed(() => {
+    const img = altNews.value.image
+    if (!img) return '/placeholder.jpg'
+    return img.startsWith('http') ? img : `${config.public.apiBaseUrl}/storage/${img}`
+})
+
 const altNews = ref<AltNews>({
     id: 0,
     title: '',
@@ -167,8 +174,8 @@ watch(newsId, async () => {
                     <div class="col-lg-4">
                         <div class="tp-team-details-thumb mb-30 wow img-custom-anim-left" data-wow-duration="1.5s"
                             data-wow-delay="0.2s">
-                            <img class="w-100 tp-round-4 shadow-lg" 
-                                 :src="`${config.public.apiBaseUrl}/storage/${altNews.image}`"
+                            <img class="w-100 tp-round-4 shadow-lg"
+                                 :src="imageUrl"
                                  alt="Image ALT News">
                         </div>
                     </div>

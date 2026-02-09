@@ -1,11 +1,71 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { onMounted, ref, watch, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import LoginModal from '~/components/LoginModal.vue';
+import SubscriptionCompo from '~/components/SubscriptionCompo.vue';
 
 const config = useRuntimeConfig();
 const { t, locale } = useI18n();
 const route = useRoute();
+const router = useRouter();
+
+// Modaux
+const showLoginModal = ref(false);
+const showPlansModal = ref(false);
+
+// Vérifier si l'utilisateur est connecté et a un plan premium
+const { isLoggedIn, getAuthUser } = useAuth();
+const userLoggedIn = computed(() => isLoggedIn());
+
+// Vérifier si l'utilisateur a un plan premium actif
+const hasPremiumPlan = computed(() => {
+    if (!userLoggedIn.value) return false;
+
+    const user = getAuthUser();
+    if (!user) return false;
+
+    // Les types de plans premium qui donnent accès au contenu
+    const premiumTypes = ['annual', 'student', 'monthly'];
+    const hasPremiumType = premiumTypes.includes(user.type);
+
+    // Vérifier si l'abonnement n'est pas expiré
+    if (user.expiresAt) {
+        const expirationDate = new Date(user.expiresAt);
+        const now = new Date();
+        if (expirationDate < now) {
+            return false; // Abonnement expiré
+        }
+    }
+
+    return hasPremiumType;
+});
+
+// Calculer si le contenu est accessible
+const isPremiumContent = computed(() => altNews.value.is_free === false);
+const canAccessContent = computed(() => {
+    // Si gratuit, tout le monde peut accéder
+    if (altNews.value.is_free) return true;
+    // Si premium, il faut être connecté ET avoir un plan premium actif
+    return hasPremiumPlan.value;
+});
+
+// Ouvrir le modal de connexion
+const openLoginModal = () => {
+    showLoginModal.value = true;
+};
+
+// Ouvrir le modal des plans
+const openPlansModal = () => {
+    showPlansModal.value = true;
+};
+
+// Gestion du succès de connexion
+const handleLoginSuccess = (user: any) => {
+    console.log('✅ Utilisateur connecté:', user.email);
+    // Fermer le modal et recharger les données
+    showLoginModal.value = false;
+};
 
 interface AltNews {
     id: number;
@@ -15,6 +75,7 @@ interface AltNews {
     iFrame: string;
     pdf: string;
     content: string;
+    is_free?: boolean;
 }
 
 const { formatDate } = useFormatDate()
@@ -26,7 +87,8 @@ const altNews = ref<AltNews>({
     image: '',
     iFrame: '',
     pdf: '',
-    content: ''
+    content: '',
+    is_free: true
 });
 
 const loading = ref(true);
@@ -155,11 +217,20 @@ onMounted( async () => {
             <div class="container">
                 <div class="row">
                     <div class="col-lg-4">
-                        <div class="tp-team-details-thumb mb-30 wow img-custom-anim-left" data-wow-duration="1.5s"
+                        <div class="tp-team-details-thumb mb-30 wow img-custom-anim-left position-relative" data-wow-duration="1.5s"
                             data-wow-delay="0.2s">
-                            <img class="w-100 tp-round-4 shadow-lg" 
+                            <img class="w-100 tp-round-4 shadow-lg"
                                  :src="`${config.public.apiBaseUrl}/storage/${altNews.image}`"
                                  alt="Image ALT News">
+                            <!-- Badge Premium/Gratuit -->
+                            <div class="edition-type-badge">
+                                <span v-if="altNews.is_free" class="badge-free">
+                                    <i class="fa-solid fa-gift me-1"></i> Gratuit
+                                </span>
+                                <span v-else class="badge-premium">
+                                    <i class="fa-solid fa-crown me-1"></i> Premium
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <div class="col-lg-8">
@@ -172,10 +243,10 @@ onMounted( async () => {
                                 <span class="cs-text-dark fw-600 fs-18">{{ formatDate(altNews.date) }}</span>
                                 <span v-if="String(altNews.title).match(/\d+/g)" class="cs-badge ms-3">ALT #{{ String(altNews.title).match(/\d+/g)![0] }}</span>
                             </div>
-                            <div class="mb-40" v-if="altNews.content">
+                            <div class="mb-40" v-if="altNews.content && canAccessContent">
                                 <div v-html="altNews.content"></div>
                             </div>
-                            <span class="fw-600 fs-16 cs-text-gold p-3 border-bottom">Explorer les détails ci-dessous</span>
+                            <span v-if="canAccessContent" class="fw-600 fs-16 cs-text-gold p-3 border-bottom">Explorer les détails ci-dessous</span>
                         </div>
                     </div>
                 </div>
@@ -188,7 +259,46 @@ onMounted( async () => {
                 <div class="row">
                     <!-- Timeline avec points de navigation -->
                     <div class="col-12">
-                        <div class="cs-timeline-container">
+                        <!-- Message de blocage pour contenu premium non accessible -->
+                        <div v-if="isPremiumContent && !canAccessContent" class="premium-block-message">
+                            <div class="premium-block-content">
+                                <div class="premium-block-icon">
+                                    <i class="fa-solid fa-lock"></i>
+                                </div>
+                                <!-- Utilisateur non connecté -->
+                                <template v-if="!userLoggedIn">
+                                    <h3>Contenu réservé aux abonnés</h3>
+                                    <p>Connectez-vous à votre espace abonné pour accéder à l'intégralité de cette édition premium.</p>
+                                    <div class="premium-block-actions">
+                                        <button @click="openLoginModal" class="btn-login-premium">
+                                            <i class="fa-solid fa-right-to-bracket me-2"></i>
+                                            Se connecter
+                                        </button>
+                                        <button @click="openPlansModal" class="btn-subscribe-premium">
+                                            <i class="fa-solid fa-crown me-2"></i>
+                                            S'abonner
+                                        </button>
+                                    </div>
+                                    <p class="premium-block-hint">
+                                        Pas encore de compte ? <button @click="openPlansModal" class="link-subscribe">Créez-en un gratuitement</button>
+                                    </p>
+                                </template>
+                                <!-- Utilisateur connecté mais sans plan premium -->
+                                <template v-else>
+                                    <h3>Abonnement Premium requis</h3>
+                                    <p>Votre abonnement actuel ne vous donne pas accès aux éditions premium. Passez à un abonnement Premium pour débloquer tout le contenu.</p>
+                                    <div class="premium-block-actions">
+                                        <button @click="openPlansModal" class="btn-subscribe-premium">
+                                            <i class="fa-solid fa-crown me-2"></i>
+                                            Passer à Premium
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Contenu accessible (gratuit ou utilisateur connecté) -->
+                        <div v-else class="cs-timeline-container">
                             <!-- Section Wireframe/iFrame -->
                             <div class="cs-timeline-item" v-if="altNews.iFrame">
                                 <div class="cs-timeline-marker">
@@ -233,7 +343,7 @@ onMounted( async () => {
                                             </span>
                                         </button>
                                     </div>
-                                    
+
                                     <!-- PDF Preview -->
                                     <div v-if="showPdfPreview" class="pdf-preview mt-3">
                                         <iframe :src="`${config.public.apiBaseUrl}/storage/${altNews.pdf}`"
@@ -262,6 +372,28 @@ onMounted( async () => {
                 </div>
             </div>
         </div>
+
+        <!-- Modal de connexion -->
+        <LoginModal v-model="showLoginModal" @login-success="handleLoginSuccess" @register-click="openPlansModal" />
+
+        <!-- Modal des plans d'abonnement -->
+        <Teleport to="body">
+            <Transition name="modal">
+                <div v-if="showPlansModal" class="plans-modal-overlay" @click.self="showPlansModal = false">
+                    <div class="plans-modal">
+                        <div class="plans-modal-header">
+                            <h3>Choisissez votre plan</h3>
+                            <button class="btn-close-modal" @click="showPlansModal = false" type="button">
+                                <span>×</span>
+                            </button>
+                        </div>
+                        <div class="plans-modal-body">
+                            <SubscriptionCompo @open-login-modal="showPlansModal = false; showLoginModal = true" />
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
     </div>
 </template>
 
@@ -336,6 +468,38 @@ onMounted( async () => {
     border-radius: 20px;
     font-size: 14px;
     font-weight: 600;
+}
+
+/* Badge Premium/Gratuit */
+.edition-type-badge {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    z-index: 10;
+}
+
+.badge-free {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #9E73B0, #7B1FA2);
+    color: white;
+    box-shadow: 0 4px 15px rgba(158, 115, 176, 0.4);
+}
+
+.badge-premium {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #d4b128, #b8991d);
+    color: white;
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.4);
 }
 
 .explore-banner {
@@ -450,6 +614,227 @@ onMounted( async () => {
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+/* Premium Block Message */
+.premium-block-message {
+    background: linear-gradient(135deg, #fef7f0 0%, #fff5eb 100%);
+    border: 2px solid #d4b128;
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    text-align: center;
+    margin: 2rem 0;
+    box-shadow: 0 10px 40px rgba(212, 177, 40, 0.15);
+}
+
+.premium-block-content {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.premium-block-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #d4b128, #b8991d);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 8px 25px rgba(212, 177, 40, 0.3);
+}
+
+.premium-block-icon i {
+    font-size: 2rem;
+    color: white;
+}
+
+.premium-block-message h3 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 1rem;
+}
+
+.premium-block-message p {
+    color: #6b7280;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+}
+
+.premium-block-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.btn-login-premium {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.875rem 2rem;
+    background: linear-gradient(135deg, #d4b128, #b8991d);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.3);
+}
+
+.btn-login-premium:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(212, 177, 40, 0.4);
+}
+
+.btn-subscribe-premium {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.875rem 2rem;
+    background: white;
+    color: #d4b128;
+    border: 2px solid #d4b128;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 1rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.btn-subscribe-premium:hover {
+    background: #d4b128;
+    color: white;
+    transform: translateY(-2px);
+}
+
+.premium-block-hint {
+    font-size: 0.9rem;
+    color: #9ca3af;
+    margin: 0;
+}
+
+.premium-block-hint a,
+.link-subscribe {
+    color: #d4b128;
+    font-weight: 600;
+    text-decoration: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.premium-block-hint a:hover,
+.link-subscribe:hover {
+    text-decoration: underline;
+}
+
+/* Modal des plans */
+.plans-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.plans-modal {
+    background: white;
+    border-radius: 20px;
+    max-width: 1200px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(107, 33, 168, 0.2);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.plans-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid #d4b128;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.plans-modal-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #d4b128;
+    margin: 0;
+}
+
+.btn-close-modal {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: #f3f4f6;
+    border-radius: 50%;
+    font-size: 1.8rem;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.btn-close-modal:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+.plans-modal-body {
+    padding: 0;
+}
+
+/* Animation de la modal */
+.modal-enter-active,
+.modal-leave-active {
+    transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+    opacity: 0;
+}
+
+.modal-enter-active .plans-modal,
+.modal-leave-active .plans-modal {
+    transition: transform 0.3s ease;
+}
+
+.modal-enter-from .plans-modal,
+.modal-leave-to .plans-modal {
+    transform: scale(0.9);
 }
 
 /* Responsive */

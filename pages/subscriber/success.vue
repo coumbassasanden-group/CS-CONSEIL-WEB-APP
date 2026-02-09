@@ -78,7 +78,7 @@
 
         <!-- Actions -->
         <div class="success-actions">
-          <NuxtLink to="/alt-news" class="btn-primary">
+          <NuxtLink :to="`/${currentLocale}/alt-news`" class="btn-primary">
             <span>Découvrir les articles</span>
             <span class="btn-icon">→</span>
           </NuxtLink>
@@ -104,6 +104,14 @@ import { Icon } from "@iconify/vue"
 import LoginModal from '~/components/LoginModal.vue'
 
 // Types
+const route = useRoute()
+
+// Récupérer la locale courante depuis l'URL
+const currentLocale = computed(() => {
+  const pathParts = route.path.split('/')
+  const locale = pathParts[1]
+  return ['fr', 'en'].includes(locale) ? locale : 'fr'
+})
 
 const {
   currentSubscription,
@@ -362,7 +370,7 @@ useHead({
 .summary-header h3 {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--cs-brown-color);
+  color: #d4b128;
   margin: 0 0 0.5rem;
 }
 
@@ -500,15 +508,14 @@ useHead({
 }
 
 .btn-primary {
-  background: var(--cs-brown-color);
+  background: #d4b128;
   color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.3);
+  box-shadow: 0 4px 12px rgba(212, 177, 40, 0.3);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 46, 0.4);
-  opacity: 0.9;
+  box-shadow: 0 6px 20px rgba(212, 177, 40, 0.4);
 }
 
 .btn-icon {
@@ -551,7 +558,7 @@ useHead({
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--cs-brown-color);
+  color: #d4b128;
   text-decoration: none;
   font-weight: 600;
   transition: all 0.3s ease;

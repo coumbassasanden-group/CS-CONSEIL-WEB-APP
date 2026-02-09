@@ -104,16 +104,34 @@ restez informer des nouvelles parutions.</h5>
                                 </span>
                             </div>
 
-                             <div style="position: relative; ">
-                                    <button 
-                                    style="position: absolute; left: 6rem !important; background-color: none !important;" 
-                                    @click="showLoginModal = true"  class="login-button"> Accéder à mon espace  </button>
-                              </div>
+                            <div class="login-button-container">
+                                <button @click="showLoginModal = true" class="login-button">
+                                    <i class="fa-solid fa-user me-2"></i>
+                                    Accéder à mon espace
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <subscription-compo v-if="isSubcribe"></subscription-compo>
-                <LoginModal v-model="showLoginModal" @login-success="handleLoginSuccess" />
+                <!-- Modal d'abonnement -->
+                <Teleport to="body">
+                    <Transition name="modal">
+                        <div v-if="isSubcribe" class="subscription-modal-overlay" @click.self="isSubcribe = false">
+                            <div class="subscription-modal">
+                                <div class="subscription-modal-header">
+                                    <h3>Créer votre compte</h3>
+                                    <button class="btn-close-modal" @click="isSubcribe = false" type="button">
+                                        <span>×</span>
+                                    </button>
+                                </div>
+                                <div class="subscription-modal-body">
+                                    <subscription-compo @open-login-modal="isSubcribe = false; showLoginModal = true"></subscription-compo>
+                                </div>
+                            </div>
+                        </div>
+                    </Transition>
+                </Teleport>
+                <LoginModal v-model="showLoginModal" @login-success="handleLoginSuccess" @register-click="handleSubscribe" />
             </div>
         </div>
     </section>
@@ -186,8 +204,8 @@ restez informer des nouvelles parutions.</h5>
     transition: color .3s ease-out 0s;
 }
 .subscribe-button{
-    background-color: var(--cs-brown-color);
-    box-shadow: 0 4px 15px #d4b1284d;
+    background: #d4b128;
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.3);
     color: #fff;
     cursor: pointer !important;
     font-weight: 700;
@@ -201,26 +219,40 @@ restez informer des nouvelles parutions.</h5>
     padding: 1rem 2rem;
 }
 
-.login-button{
-    background-color: none !important;
-    box-shadow: 0 4px 15px #d4b1284d;
-    color: var(--cs-brown-color);
-    cursor: pointer !important;
+.login-button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+.login-button {
+    background-color: transparent;
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.2);
+    color: #d4b128;
+    cursor: pointer;
     font-weight: 700;
-    overflow: hidden !important;
-    position: relative !important;
-    text-decoration: none !important;
-    transition: all .3s ease !important;
-    border: 2px solid var(--cs-brown-color) !important;
+    overflow: hidden;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border: 2px solid #d4b128;
     border-radius: 50px;
-    margin-top: 2px;
     padding: 1rem 2rem;
+    display: inline-flex;
+    align-items: center;
+}
+
+.login-button:hover {
+    background: #d4b128;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 177, 40, 0.4);
+    border-color: #d4b128;
 }
 
 .link-button {
     background: none;
     border: none;
-    color: var(--cs-brown-color);
+    color: #d4b128;
     cursor: pointer;
     font-weight: 700;
     padding: 0;
@@ -229,6 +261,110 @@ restez informer des nouvelles parutions.</h5>
 }
 
 .link-button:hover {
-    color: var(--cs-gold-color);
+    color: #b89a22;
+}
+
+/* Modal d'abonnement */
+.subscription-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.subscription-modal {
+    background: white;
+    border-radius: 20px;
+    max-width: 1200px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(212, 177, 40, 0.2);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.subscription-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid #d4b128;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.subscription-modal-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #d4b128;
+    margin: 0;
+}
+
+.btn-close-modal {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: #f3f4f6;
+    border-radius: 50%;
+    font-size: 1.8rem;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.btn-close-modal:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+.subscription-modal-body {
+    padding: 0;
+}
+
+/* Animation de la modal */
+.modal-enter-active,
+.modal-leave-active {
+    transition: opacity 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+    opacity: 0;
+}
+
+.modal-enter-active .subscription-modal,
+.modal-leave-active .subscription-modal {
+    transition: transform 0.3s ease;
+}
+
+.modal-enter-from .subscription-modal,
+.modal-leave-to .subscription-modal {
+    transform: scale(0.9);
 }
 </style>

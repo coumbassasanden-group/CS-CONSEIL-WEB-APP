@@ -48,7 +48,7 @@
     <!-- Form Section - New Email-First Workflow -->
     <section v-if="subscriptionForm.planId" class="form-section">
       <div class="container-small">
-        <SubscriptionFormEmail />
+        <SubscriptionFormEmail @open-login-modal="$emit('open-login-modal')" />
       </div>
     </section>
 
@@ -101,6 +101,11 @@
 </template>
 
 <script setup lang="ts">
+// Emits pour communiquer avec le parent
+const emit = defineEmits<{
+  (e: 'open-login-modal'): void
+}>()
+
 const {
   subscriptionPlans,
   subscriptionForm,
@@ -139,8 +144,14 @@ const retryLoadPlans = async () => {
 
 // Gestion de la sélection de plan
 const handlePlanSelect = (planId: string) => {
+  console.log('🔷 SubscriptionCompo: handlePlanSelect called with planId:', planId)
+  console.log('🔷 Before selectPlan - subscriptionForm.planId:', subscriptionForm.value.planId)
+  console.log('🔷 Before selectPlan - subscriptionForm.userId:', subscriptionForm.value.userId)
+
   selectPlan(planId)
-  
+
+  console.log('🔷 After selectPlan - subscriptionForm.planId:', subscriptionForm.value.planId)
+
   // Scroll vers le formulaire
   nextTick(() => {
     const formSection = document.querySelector('.form-section')
@@ -200,7 +211,11 @@ const closePaymentModal = () => {
 
 const handlePaymentConfirm = () => {
   closePaymentModal()
-  navigateTo('/subscriber/success')
+  // Récupérer la locale courante
+  const pathParts = window.location.pathname.split('/')
+  const locale = ['fr', 'en'].includes(pathParts[1]) ? pathParts[1] : 'fr'
+  // Rediriger vers l'espace abonné
+  navigateTo(`/${locale}/subscriber/manage`)
 }
 
 const handlePaymentRetry = () => {
@@ -302,7 +317,7 @@ useHead({
 }
 
 .gradient-text {
-  background: var(--cs-brown-color);
+  background: #d4b128;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -330,7 +345,7 @@ useHead({
 .stat-value {
   font-size: 2.5rem;
   font-weight: 800;
-  color: var(--cs-brown-color);
+  color: #d4b128;
   margin-bottom: 0.5rem;
 }
 
@@ -411,7 +426,7 @@ useHead({
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: var(--cs-brown-color);
+  background: #d4b128;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -465,12 +480,12 @@ useHead({
 }
 
 .faq-item:hover {
-  border-color: var(--cs-brown-color);
+  border-color: #d4b128;
 }
 
 .faq-item.active {
-  border-color: var(--cs-brown-color);
-  box-shadow: 0 4px 20px rgba(139, 92, 46, 0.15);
+  border-color: #d4b128;
+  box-shadow: 0 4px 20px rgba(212, 177, 40, 0.15);
 }
 
 .faq-question {
@@ -485,7 +500,7 @@ useHead({
 
 .faq-icon {
   font-size: 1.5rem;
-  color: var(--cs-brown-color);
+  color: #d4b128;
   font-weight: bold;
   transition: transform 0.3s ease;
 }
@@ -510,7 +525,7 @@ useHead({
 /* CTA Section */
 .cta-section {
   padding: 5rem 0;
-  background: var(--cs-brown-color);
+  background: #d4b128;
   text-align: center;
 }
 
@@ -532,7 +547,7 @@ useHead({
   border: 2px solid white;
   border-radius: 12px;
   background: white;
-  color: var(--cs-brown-color);
+  color: #d4b128;
   font-size: 1.1rem;
   font-weight: 700;
   cursor: pointer;
@@ -560,7 +575,7 @@ useHead({
   width: 50px;
   height: 50px;
   border: 4px solid #e5e7eb;
-  border-top-color: var(--cs-brown-color);
+  border-top-color: #d4b128;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }

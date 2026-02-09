@@ -283,9 +283,9 @@ const formatPrice = (price: number) => {
 
 .form-input:focus {
   outline: none;
-  border-color: var(--cs-brown-color);
+  border-color: #d4b128;
   background: white;
-  box-shadow: 0 0 0 3px rgba(139, 92, 46, 0.1);
+  box-shadow: 0 0 0 3px rgba(212, 177, 40, 0.1);
 }
 
 .file-input-wrapper {
@@ -315,7 +315,7 @@ const formatPrice = (price: number) => {
 }
 
 .file-input-wrapper:hover .file-input-label {
-  border-color: var(--cs-brown-color);
+  border-color: #d4b128;
   background: #fef7f0;
 }
 
@@ -366,8 +366,8 @@ const formatPrice = (price: number) => {
 }
 
 .checkbox-input:checked ~ .checkbox-custom {
-  background-color: var(--cs-brown-color);
-  border-color: var(--cs-brown-color);
+  background-color: #d4b128;
+  border-color: #d4b128;
 }
 
 .checkbox-input:checked ~ .checkbox-custom::after {
@@ -388,7 +388,7 @@ const formatPrice = (price: number) => {
 }
 
 .link {
-  color: var(--cs-brown-color);
+  color: #d4b128;
   text-decoration: none;
   font-weight: 600;
 }
@@ -456,7 +456,7 @@ const formatPrice = (price: number) => {
 .price-amount {
   font-size: 1.8rem;
   font-weight: 800;
-  color: var(--cs-brown-color);
+  color: #d4b128;
   display: block;
 }
 
@@ -474,9 +474,9 @@ const formatPrice = (price: number) => {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: var(--cs-brown-color);
+  background: #d4b128;
   color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.3);
+  box-shadow: 0 4px 12px rgba(212, 177, 40, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -485,7 +485,7 @@ const formatPrice = (price: number) => {
 
 .btn-submit:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 46, 0.4);
+  box-shadow: 0 6px 20px rgba(212, 177, 40, 0.4);
   opacity: 0.9;
 }
 

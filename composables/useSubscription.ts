@@ -2,8 +2,8 @@ export const useSubscription = () => {
   const config = useRuntimeConfig()
   const router = useRouter()
 
-  // Plans d'abonnement (données de fallback)
-  const subscriptionPlans = ref<any[]>([])
+  // Plans d'abonnement - PARTAGÉ entre composants via useState
+  const subscriptionPlans = useState<any[]>('subscriptionPlans', () => [])
   const plansLoading = ref(false)
   const plansError = ref('')
 
@@ -18,8 +18,8 @@ export const useSubscription = () => {
   const userExists = ref(false)
   const existingUserData = ref<any>(null)
 
-  // État du formulaire
-  const subscriptionForm = ref({
+  // État du formulaire - PARTAGÉ entre composants via useState
+  const subscriptionForm = useState('subscriptionForm', () => ({
     userId: null as string | null,
     planId: null as string | null,
     email: '',
@@ -31,7 +31,7 @@ export const useSubscription = () => {
     acceptTerms: false,
     newsletter: true,
     transactionId: '' // ID de transaction pour le paiement
-  })
+  }))
 
   // État du processus
   const isProcessing = ref(false)
@@ -114,14 +114,14 @@ export const useSubscription = () => {
    * Vérifier si un email existe déjà dans le système
    * Si oui, retourne les données de l'utilisateur existant
    */
-  const checkEmail = async (email: string) => {
+  const checkEmail = async (email: string, skipFormUpdate: boolean = false) => {
     emailCheckLoading.value = true
     emailCheckError.value = ''
     userExists.value = false
     existingUserData.value = null
 
     try {
-      const response = await fetch(`${config.public.apiSubcriptionUrl}auth/check-email?email=${encodeURIComponent(email)}`, {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/auth/check-email?email=${encodeURIComponent(email)}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -139,15 +139,20 @@ export const useSubscription = () => {
         // L'email existe - pré-remplir le formulaire
         userExists.value = true
         existingUserData.value = data
-        
-        // Pré-remplir le formulaire avec les données existantes
-        subscriptionForm.value.userId = data.id || null
-        subscriptionForm.value.email = data.email || ''
-        subscriptionForm.value.firstName = data.firstName || ''
-        subscriptionForm.value.lastName = data.lastName || ''
-        subscriptionForm.value.phone = data.phone || ''
-        
-        console.log('Utilisateur existant trouvé:', data)
+
+        // Ne pas écraser les données du formulaire si skipFormUpdate est true
+        // ou si l'utilisateur a déjà un userId défini
+        if (!skipFormUpdate && !subscriptionForm.value.userId) {
+          subscriptionForm.value.userId = data.id || null
+          subscriptionForm.value.email = data.email || ''
+          subscriptionForm.value.firstName = data.firstName || ''
+          subscriptionForm.value.lastName = data.lastName || ''
+          subscriptionForm.value.phone = data.phone || ''
+          console.log('Utilisateur existant trouvé, formulaire mis à jour:', data)
+        } else {
+          console.log('Utilisateur existant trouvé mais formulaire non écrasé (skipFormUpdate ou userId déjà défini)')
+        }
+
         return { exists: true, user: data }
       } else {
         // L'email n'existe pas - nouvel utilisateur
@@ -181,7 +186,7 @@ export const useSubscription = () => {
         phone
       }
 
-      const response = await fetch(`${config.public.apiSubcriptionUrl}auth/register`, {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/auth/register`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -192,6 +197,16 @@ export const useSubscription = () => {
 
       if (!response.ok) {
         const errorData = await response.json()
+        // Vérifier si l'erreur est due à un email existant
+        const emailExistsError = errorData.message?.toLowerCase().includes('email') &&
+          (errorData.message?.toLowerCase().includes('taken') ||
+           errorData.message?.toLowerCase().includes('existe') ||
+           errorData.message?.toLowerCase().includes('already'))
+
+        if (emailExistsError || response.status === 422) {
+          errorMessage.value = 'Un compte existe déjà avec cet email. Veuillez vous connecter.'
+          return { success: false, emailExists: true, error: errorMessage.value }
+        }
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
 
@@ -201,12 +216,12 @@ export const useSubscription = () => {
       if (data.user) {
         // Utilisateur créé avec succès
         console.log('Utilisateur créé avec succès:', data.user)
-        
+
         // Stocker le token si nécessaire
         if (data.token) {
           localStorage.setItem('auth_token', data.token)
         }
-        
+
         // Pré-remplir automatiquement le formulaire
         subscriptionForm.value.userId = data.user.id || null
         subscriptionForm.value.email = data.user.email || email
@@ -265,7 +280,7 @@ export const useSubscription = () => {
     plansError.value = ''
     
     try {
-      const response = await fetch(`${config.public.apiSubcriptionUrl}plans`, {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/plans`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -279,8 +294,8 @@ export const useSubscription = () => {
       
       const data = await response.json()
       
-      // L'API retourne { data: [...], meta: {...} }
-      const plans = data.data || data
+      // L'API retourne { data: [...], meta: {...} } ou { plans: [...] }
+      const plans = data.plans || data.data || data
       
       // Normaliser les plans (parser les features JSON, convertir les prix, etc.)
       subscriptionPlans.value = Array.isArray(plans) 
@@ -302,7 +317,17 @@ export const useSubscription = () => {
    */
   const fetchPlan = async (planId: string | number) => {
     try {
-      const response = await fetch(`${config.public.apiSubcriptionUrl}plans/${planId}`, {
+      // Note: Le backend n'a pas forcément de route individuelle, on cherche dans la liste
+      if (subscriptionPlans.value.length === 0) {
+        await fetchPlans()
+      }
+      
+      const plan = subscriptionPlans.value.find(p => p.id === planId || p.type === planId)
+      return plan || null
+      
+      /* 
+      // Code original si route existante:
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/plans/${planId}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -319,6 +344,7 @@ export const useSubscription = () => {
       
       // Normaliser le plan
       return normalizePlan(plan)
+      */
     } catch (error) {
       console.error('Erreur fetchPlan:', error)
       return null
@@ -326,7 +352,7 @@ export const useSubscription = () => {
   }
 
   /**
-   * Créer un nouvel abonnement
+   * Créer ou mettre à jour un abonnement
    */
   const createSubscription = async (subscriptionData: any) => {
 
@@ -334,10 +360,59 @@ export const useSubscription = () => {
     isProcessing.value = true
     errorMessage.value = ''
     processingStep.value = 'payment'
-    
+
     try {
       const formData = new FormData()
-      
+
+      // Récupérer le token d'authentification
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+
+      // ✅ Utiliser le transactionId passé en paramètre ou depuis subscriptionData
+      const txId = subscriptionData?.transactionId || subscriptionForm.value.transactionId || ''
+
+      console.log('📤 TransactionID envoyé à l\'API:', txId)
+      console.log('📤 PlanID envoyé à l\'API:', subscriptionForm.value.planId)
+      console.log('📤 UserID envoyé à l\'API:', subscriptionForm.value.userId)
+      console.log('📤 Token présent:', !!token)
+
+      // ✅ Si l'utilisateur est connecté (a un token), utiliser l'endpoint change-plan
+      if (token && subscriptionForm.value.userId) {
+        console.log('📤 Utilisateur connecté - utilisation de change-plan')
+
+        formData.append('planId', String(subscriptionForm.value.planId))
+        formData.append('transactionId', txId)
+
+        // Ajouter le justificatif étudiant si applicable
+        if (subscriptionForm.value.studentProof) {
+          formData.append('student_proof', subscriptionForm.value.studentProof)
+        }
+
+        const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/change-plan`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          console.error('Erreur changePlan:', errorData?.message)
+          throw new Error(errorData.message || `Une erreur est survenue, réessayez!`)
+        }
+
+        const data = await response.json()
+        console.log('✅ Réponse API change-plan:', data)
+
+        processingStep.value = 'confirmation'
+        currentSubscription.value = data.subscriber || data
+
+        return true
+      }
+
+      // ✅ Sinon, nouvel utilisateur - utiliser l'endpoint subscribe
+      console.log('📤 Nouvel utilisateur - utilisation de subscribe')
+
       // Ajouter les données du formulaire
       if (subscriptionForm.value.userId) {
         formData.append('userId', subscriptionForm.value.userId)
@@ -349,34 +424,38 @@ export const useSubscription = () => {
       formData.append('phone', subscriptionForm.value.phone || '')
       formData.append('planId', String(subscriptionForm.value.planId))
       formData.append('newsletter', String(subscriptionForm.value.newsletter))
-      
-      // ✅ Utiliser le transactionId passé en paramètre ou depuis subscriptionData
-      const txId = subscriptionData?.transactionId || subscriptionForm.value.transactionId || ''
       formData.append('transactionId', txId)
-      console.log('📤 TransactionID envoyé à l\'API:', txId)
-      
-      
+
       // Ajouter le justificatif étudiant si applicable
       if (subscriptionForm.value.studentProof) {
         formData.append('studentProof', subscriptionForm.value.studentProof)
       }
-      
-      const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions`, {
+
+      // Construire les headers avec authentification si disponible
+      const headers: Record<string, string> = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+        console.log('📤 Token d\'authentification inclus')
+      }
+
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/subscribe`, {
         method: 'POST',
+        headers,
         body: formData
       })
-      
+
       if (!response.ok) {
         const errorData = await response.json()
         console.error('Erreur createSubscription:', errorData?.error)
         throw new Error(errorData.error || `Une erreur est survenue, réessayez!`)
       }
-      
+
       const data = await response.json()
-      
+      console.log('✅ Réponse API subscription:', data)
+
       processingStep.value = 'confirmation'
       currentSubscription.value = data.data || data
-      
+
       return true
     } catch (error: any) {
       errorMessage.value = error.message || 'Erreur lors de la création de l\'abonnement'
@@ -395,9 +474,8 @@ export const useSubscription = () => {
     subscriptionError.value = ''
     
     try {
-      const url = userId 
-        ? `${config.public.apiSubcriptionUrl}subscriptions/user/${userId}`
-        : `${config.public.apiSubcriptionUrl}subscriptions/current`
+      // Utilise l'endpoint profile qui renvoie les infos de l'abonnement actuel
+      const url = `${config.public.apiSubcriptionUrl}subscription/profile`
       
       const response = await fetch(url, {
         method: 'GET',
@@ -442,7 +520,7 @@ export const useSubscription = () => {
         ...paymentData
       }
       
-      const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions/${subscriptionId}/renew`, {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/renew`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -477,7 +555,7 @@ export const useSubscription = () => {
     errorMessage.value = ''
     
     try {
-      const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions/${subscriptionId}/cancel`, {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/cancel`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -511,7 +589,7 @@ export const useSubscription = () => {
     errorMessage.value = ''
     
     try {
-      const response = await fetch(`${config.public.apiSubcriptionUrl}subscriptions/${subscriptionId}`, {
+      const response = await fetch(`${config.public.apiSubcriptionUrl}subscription/update-profile`, {
         method: 'PUT',
         headers: {
           'Accept': 'application/json',
@@ -585,6 +663,8 @@ export const useSubscription = () => {
   }
 
   const resetForm = () => {
+    console.log('⚠️ resetForm called!')
+    console.trace('resetForm stack trace')
     subscriptionForm.value = {
       userId: null,
       planId: null,

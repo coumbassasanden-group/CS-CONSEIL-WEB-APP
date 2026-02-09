@@ -25,7 +25,7 @@ const mode = (runtimeConfig as any)?.cinetpay?.mode
 const props = defineProps({
   structure: { type: String, required: true },
   userName: { type: String, required: true },
-  phone: { type: String, required: true },
+  phone: { type: String, required: false, default: '' },
   email: { type: String, required: true },
   amount: { type: Number, required: true },
   service: { type: String, required: true },
@@ -94,15 +94,17 @@ const checkout = async (handlePost?: Function) => {
     return
   }
 
-  // Vérifier les paramètres requis
-  if (!props.amount || !props.email || !props.phone) {
+  // Vérifier les paramètres requis (phone est optionnel)
+  if (!props.amount || !props.email) {
     console.error('❌ Paramètres manquants:', {
       amount: props.amount,
-      email: props.email,
-      phone: props.phone
+      email: props.email
     })
     return
   }
+
+  // Utiliser un numéro par défaut si non fourni
+  const phoneNumber = props.phone || '0000000000'
 
   isLoading.value = true
 
@@ -125,7 +127,7 @@ const checkout = async (handlePost?: Function) => {
       amount: props.amount,
       customer_name: props.firstName,
       customer_email: props.email,
-      customer_phone_number: props.phone
+      customer_phone_number: phoneNumber
     })
 
     // Gérer les erreurs Cinetpay AVANT getCheckout
@@ -176,7 +178,7 @@ const checkout = async (handlePost?: Function) => {
       customer_name: props.firstName || props.userName,
       customer_surname: props.lastName || '',
       customer_email: props.email,
-      customer_phone_number: props.phone,
+      customer_phone_number: phoneNumber,
       customer_address: 'BP 000',
       customer_city: 'Abidjan',
       customer_country: 'CI',

@@ -20,28 +20,28 @@ export default defineNuxtRouteMiddleware((to, from) => {
   if (isManageRoute) {
     if (!authToken || !authUserStr) {
       console.warn('❌ Authentification requise pour accéder à /subscriber/manage')
-      
+
       // Récupérer la locale depuis l'URL
       const locale = to.params.locale || 'fr'
-      
-      // Rediriger vers la page de sélection des plans
-      return navigateTo(`/${locale}/subscriber`)
+
+      // Rediriger vers la page alt-news
+      return navigateTo(`/${locale}/alt-news`)
     }
 
     // Vérifier que le token et l'utilisateur sont valides
     try {
       const authUser = JSON.parse(authUserStr)
-      
-      // Vérifier que l'utilisateur est actif
-      if (!authUser.isActive) {
+
+      // Vérifier que l'utilisateur est actif (status = 'active')
+      if (authUser.status !== 'active') {
         console.warn('⚠️ Compte utilisateur inactif')
         const locale = to.params.locale || 'fr'
         localStorage.removeItem('authToken')
         localStorage.removeItem('authUser')
         localStorage.removeItem('authData')
-        return navigateTo(`/${locale}/subscriber`)
+        return navigateTo(`/${locale}/alt-news`)
       }
-      
+
       console.log('✅ Authentification valide pour', authUser.email)
     } catch (error) {
       console.error('❌ Erreur lors de la vérification de l\'authentification:', error)
@@ -49,7 +49,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
       localStorage.removeItem('authUser')
       localStorage.removeItem('authData')
       const locale = to.params.locale || 'fr'
-      return navigateTo(`/${locale}/subscriber`)
+      return navigateTo(`/${locale}/alt-news`)
     }
   }
 

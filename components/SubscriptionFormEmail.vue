@@ -97,24 +97,34 @@
     </section>
 
     <!-- ========== ÉTAPE 2B: NOUVEL UTILISATEUR ========== -->
-    <section v-if="currentStep === 'new-user' && !userExists" class="step new-user-step">
+    <section v-if="currentStep === 'new-user'" class="step new-user-step">
       <div class="step-header">
         <h2>Créer votre compte</h2>
         <p>Complétez vos informations pour continuer</p>
       </div>
 
       <form @submit.prevent="handleRegistration" class="registration-form">
-        <!-- Email (non modifiable) -->
+        <!-- Email -->
         <div class="form-group">
-          <label for="email-display">Email</label>
+          <label for="email-display">Email *</label>
           <input
             id="email-display"
             v-model="subscriptionForm.email"
             type="email"
-            disabled
-            class="form-control disabled"
+            required
+            placeholder="exemple@email.com"
+            :disabled="isProcessing"
+            class="form-control"
+            :class="{ 'input-warning': emailExistsWarning }"
           />
-          <small class="form-text">Non modifiable</small>
+          <div v-if="checkingEmail" class="email-checking">
+            <span class="spinner-icon">⟳</span> Vérification...
+          </div>
+          <div v-if="emailExistsWarning" class="alert alert-warning mt-2">
+            <strong>Vous avez déjà un compte !</strong><br>
+            Veuillez vous connecter avec cet email.
+            <button type="button" @click="goToLogin" class="btn-link-warning">Connectez-vous ici</button>
+          </div>
         </div>
 
         <!-- Mot de passe -->
@@ -193,7 +203,12 @@
           {{ errorMessage }}
         </div>
 
-       
+        <!-- Lien vers connexion -->
+        <div class="login-link-wrapper">
+          <p class="login-text">Déjà inscrit ?
+            <button type="button" @click="goToLogin" class="btn-link">Connectez-vous</button>
+          </p>
+        </div>
       </form>
     </section>
 
@@ -265,7 +280,7 @@
     </section>
 
     <!-- ========== ÉTAPE 4: FINALISATION ========== -->
-    <section v-if="currentStep === 'select-plan' && subscriptionForm.planId && subscriptionForm.userId" class="step finalization-step">
+    <section v-if="shouldShowRecap" class="step finalization-step">
       <div class="step-header">
         <h2>Récapitulatif de votre abonnement</h2>
         <p>Vérifiez les détails avant de finaliser</p>
@@ -276,9 +291,9 @@
       <div v-if="selectedPlanDetails || getSelectedPlan" class="selected-plan-summary">
         <div class="plan-card-summary">
           <div class="plan-header">
-            <h3>{{ (selectedPlanDetails || getSelectedPlan).name }}</h3>
+            <h3>{{ (selectedPlanDetails || getSelectedPlan)?.name }}</h3>
             <span v-if="selectedPlanDetails?.id !== freePlan" class="plan-price">
-              {{ formatPrice((selectedPlanDetails || getSelectedPlan).price) }}/ {{ getSelectedPlan.id === monthlyPlan ? 'édition' : 'an' }}
+              {{ formatPrice((selectedPlanDetails || getSelectedPlan)?.price || 0) }}/an
             </span>
             
             <span v-else style="color: var(--cs-brown-color); font: bold;" class="plan-price">
@@ -304,9 +319,9 @@
               <!-- existingUserData -->
               <span class="value">{{ subscriptionForm.email }}  </span>
             </div>
-            <div v-if="(selectedPlanDetails || getSelectedPlan).period > 0" class="detail">
+            <div v-if="(selectedPlanDetails || getSelectedPlan)?.period > 0" class="detail">
               <span class="label">Durée :</span>
-              <span class="value">{{ (selectedPlanDetails || getSelectedPlan).duration }} jours</span>
+              <span class="value">{{ (selectedPlanDetails || getSelectedPlan)?.duration }} jours</span>
             </div>
             
           </div>
@@ -314,7 +329,7 @@
           <div style="margin-block: 1rem;" class="features-summary">
             <h4>Avantages : </h4>
             <ul style="" >
-              <li  v-for="(feature, i) in (selectedPlanDetails || getSelectedPlan).features" :key="i">
+              <li  v-for="(feature, i) in (selectedPlanDetails || getSelectedPlan)?.features || []" :key="i">
                  {{ feature }}
               </li>
             </ul>
@@ -329,58 +344,44 @@
         {{ errorMessage }}
       </div>
 
-      <!-- selectionnez votre numéro -->
-      <div v-if="selectedPlanDetails?.id === monthlyPlan" class="article-selection-section">
+      <!-- Section pour achat à l'unité (fonctionnalité future) -->
+      <!-- Les achats à l'unité sont gérés séparément sur la page des éditions -->
+
+      <!-- Justificatif étudiant -->
+      <div v-if="isStudentPlan" class="student-proof-section">
         <div class="selection-header">
-          <h3> <Icon icon="material-symbols:news-rounded" width="24" height="24" /> Sélectionnez l'édition</h3>
-          <p class="selection-subtitle">Choisissez l'édition ALT News que vous souhaitez acheter</p>
+          <h3><Icon icon="mdi:school" width="24" height="24" /> Justificatif étudiant</h3>
+          <p class="selection-subtitle">Prière d'uploader la carte d'étudiant de l'année en cours ou tout autre document justificatif</p>
           <span class="required-badge">Obligatoire</span>
         </div>
-          <div  class="empty-articles">
 
-          
-            <h3>Aucune édition disponible pour le moment</h3>
-            <p>Les prochaines éditions seront disponibles bientôt ici.</p>
-</div>
+        <div class="upload-zone" :class="{ 'has-file': studentProofFile }">
+          <input
+            type="file"
+            id="studentProof"
+            accept=".pdf,.jpg,.jpeg,.png"
+            @change="handleStudentProofUpload"
+            class="file-input"
+          />
+          <label for="studentProof" class="upload-label">
+            <Icon v-if="!studentProofFile" icon="mdi:cloud-upload" width="48" height="48" />
+            <Icon v-else icon="mdi:check-circle" width="48" height="48" class="success-icon" />
+            <span v-if="!studentProofFile">Cliquez pour télécharger votre justificatif</span>
+            <span v-else class="file-name">{{ studentProofName }}</span>
+            <small>PDF, JPG ou PNG (max 5 Mo)</small>
+          </label>
+        </div>
 
-        <!-- <div class="articles-grid">
-          <div
-            v-for="article in availableArticles"
-            :key="article.id"
-            class="article-option"
-            :class="{ selected: selectedArticle === article.id }"
-            @click="selectedArticle = article.id"
-            
-          >
-            <div class="article-radio">
-              <input
-                type="radio"
-                :id="`article-${article.id}`"
-                :value="article.id"
-                v-model="selectedArticle"
-                :required="selectedPlanDetails?.id === monthlyPlan"
-              />
-            </div>
-            <div class="article-info">
-              <h4>{{ article.number }}</h4>
-              <p class="article-date"><Icon icon="clarity:date-solid" width="24" height="24" />  {{ article.date }}</p>
-            </div>
-           
-          </div>
-        </div> -->
-
-        <!-- Validation error -->
-        <!-- <div v-if="selectedPlanDetails?.id === monthlyPlan && !selectedArticle" class="alert alert-error mt-3">
-          ⚠️ Veuillez sélectionner une édition pour continuer
-        </div> -->
+        <div v-if="isStudentPlan && !studentProofFile" class="alert alert-warning mt-3">
+          ⚠️ Veuillez télécharger un justificatif étudiant pour continuer
+        </div>
       </div>
-      <!-- selectionnez votre numéro -->
 
       <!-- Bouton de finalisation -->
       <div class="button-group mt-4">
         <button
           @click="handleCreateSubscription"
-          :disabled="isProcessing || (selectedPlanDetails?.id === monthlyPlan && !selectedArticle)"
+          :disabled="isProcessing || (isStudentPlan && !studentProofFile)"
           class="btn btn-primary btn-lg"
         >
           <span v-if="isProcessing">Création de l'abonnement...</span>
@@ -433,12 +434,12 @@
     :first-name="subscriptionForm.firstName"
     :last-name="subscriptionForm.lastName"
     :user-name="subscriptionForm.firstName + ' ' + subscriptionForm.lastName"
-    :amount="(selectedPlanDetails || getSelectedPlan)?.price || 0"
+    :amount="selectedPlanDetails?.price || 0"
     :email="subscriptionForm.email"
     :phone="subscriptionForm.phone"
     :structure="'CS-CONSEIL'"
     :service="'Subscription'"
-    :transaction-id="transactionId" 
+    :transaction-id="transactionId"
   />
 </template>
 
@@ -446,26 +447,46 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSubscription } from '~/composables/useSubscription'
+import { useAuth } from '~/composables/useAuth'
 import Cinetpay from '~/components/Cinetpay.vue'
 import {Icon} from "@iconify/vue"
 
 const router = useRouter()
+const { isLoggedIn, getAuthUser } = useAuth()
 const cinetpayRef = ref<InstanceType<typeof Cinetpay> | null>(null)
 const isPaying = ref(false)
-const freePlan = ref("a4b34a9f-95e2-447b-9d9f-73028853f2fb")
-const monthlyPlan = ref("e4609624-47af-4147-a701-396ef6130542")
+
+// Emits pour communiquer avec le parent
+const emit = defineEmits<{
+  (e: 'open-login-modal'): void
+}>()
+// IDs des plans (correspondent aux types du backend)
+const freePlan = ref("free")
+const annualPlan = ref("annual")
+const studentPlan = ref("student")
+
+// Justificatif étudiant
+const studentProofFile = ref<File | null>(null)
+const studentProofName = ref('')
+
+const handleStudentProofUpload = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    studentProofFile.value = target.files[0]
+    studentProofName.value = target.files[0].name
+    subscriptionForm.value.studentProof = target.files[0]
+  }
+}
+
+const isStudentPlan = computed(() => {
+  return selectedPlanDetails.value?.id === studentPlan.value ||
+         selectedPlanDetails.value?.type === 'student' ||
+         getSelectedPlan.value?.type === 'student'
+})
 
 const transactionId = `TXN_altnews_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-// Articles disponibles pour les abonnements mensuels
-const availableArticles = ref([
-  { id: 'dec-2025', number: 'Décembre 2025', date: '15 Décembre 2025' },
-  { id: 'nov-2025', number: 'Novembre 2025', date: '15 Novembre 2025' },
-  { id: 'oct-2025', number: 'Octobre 2025', date: '15 Octobre 2025' },
-  { id: 'sep-2025', number: 'Septembre 2025', date: '15 Septembre 2025' },
-  { id: 'aug-2025', number: 'Août 2025', date: '15 Août 2025' },
-  { id: 'jul-2025', number: 'Juillet 2025', date: '15 Juillet 2025' }
-])
+// Note: Les achats à l'unité sont gérés séparément via la page des éditions
 
 const {
   // Méthodes
@@ -501,36 +522,160 @@ const password = ref('')
 const originalUserData = ref<any>(null)
 const selectedPlanBeforeAuth = ref<string | null>(null)
 const selectedPlanDetails = ref<any>(null)
-const selectedArticle = ref<string | null>(null)
+
+// Debug: surveiller si le recap devrait s'afficher
+const shouldShowRecap = computed(() => {
+  const result = currentStep.value === 'select-plan' && !!subscriptionForm.value.planId && !!subscriptionForm.value.userId
+  console.log('🧮 shouldShowRecap computed:', result, {
+    currentStep: currentStep.value,
+    planId: subscriptionForm.value.planId,
+    userId: subscriptionForm.value.userId
+  })
+  return result
+})
+
+// Vérification email en temps réel
+const emailExistsWarning = ref(false)
+const checkingEmail = ref(false)
+let emailCheckTimeout: any = null
+
+// Vérifier l'email en temps réel quand l'utilisateur le saisit
+// Seulement si on est à l'étape new-user (création de compte)
+watch(() => subscriptionForm.value.email, (newEmail) => {
+  if (emailCheckTimeout) {
+    clearTimeout(emailCheckTimeout)
+  }
+
+  emailExistsWarning.value = false
+
+  // Ne pas vérifier l'email si on est déjà à l'étape de sélection de plan (utilisateur connecté)
+  // ou si l'utilisateur est déjà identifié
+  if (currentStep.value === 'select-plan' || subscriptionForm.value.userId) {
+    return
+  }
+
+  if (newEmail && newEmail.includes('@') && newEmail.includes('.')) {
+    emailCheckTimeout = setTimeout(async () => {
+      checkingEmail.value = true
+      try {
+        const result = await checkEmail(newEmail)
+        if (result.exists) {
+          emailExistsWarning.value = true
+        }
+      } catch (e) {
+        console.error('Erreur lors de la vérification email:', e)
+      } finally {
+        checkingEmail.value = false
+      }
+    }, 500)
+  }
+})
 
 // Charger les plans au montage
 onMounted(() => {
+  console.log('🔵 SubscriptionFormEmail mounted')
+  console.log('🔵 Initial state:', {
+    planId: subscriptionForm.value.planId,
+    userId: subscriptionForm.value.userId,
+    currentStep: currentStep.value
+  })
+
   fetchPlans()
-  
+
   // Restaurer le plan depuis localStorage s'il existe
   const savedPlan = localStorage.getItem('selectedPlan')
   if (savedPlan) {
     try {
       const parsedPlan = JSON.parse(savedPlan)
       selectedPlanDetails.value = parsedPlan
-      // IMPORTANT: Restaurer le planId dans subscriptionForm
       if (parsedPlan.id) {
-        subscriptionForm.value.planId = parsedPlan.id
+        // Ne pas écraser le planId s'il est déjà défini (par PricingCard)
+        if (!subscriptionForm.value.planId) {
+          subscriptionForm.value.planId = parsedPlan.id
+          console.log('🔵 planId restored from localStorage:', parsedPlan.id)
+        }
         selectedPlanBeforeAuth.value = parsedPlan.id
       }
     } catch (e) {
       console.error('Erreur lors de la restauration du plan:', e)
     }
   }
-  
-  // Rester sur l'étape email-check par défaut
-  currentStep.value = 'email-check'
+
+  // Si l'utilisateur est déjà connecté, pré-remplir les données et aller à la sélection du plan
+  console.log('🔵 isLoggedIn:', isLoggedIn())
+  if (isLoggedIn()) {
+    const user = getAuthUser()
+    console.log('🔵 authUser:', user)
+    if (user) {
+      subscriptionForm.value.email = user.email || ''
+      subscriptionForm.value.firstName = user.firstName || ''
+      subscriptionForm.value.lastName = user.lastName || ''
+      subscriptionForm.value.phone = user.phone || ''
+
+      // S'assurer que userId est défini - utiliser l'id ou générer un identifiant temporaire basé sur l'email
+      const userId = user.id || user.userId || user.subscriber_id
+      console.log('🔵 userId from user:', userId)
+      if (userId) {
+        subscriptionForm.value.userId = String(userId)
+      } else if (user.email) {
+        // Fallback: utiliser l'email comme identifiant temporaire si pas d'id
+        subscriptionForm.value.userId = `email:${user.email}`
+        console.warn('User ID manquant, utilisation de l\'email comme identifiant temporaire')
+      }
+
+      console.log('🔵 Final state before setting step:', {
+        planId: subscriptionForm.value.planId,
+        userId: subscriptionForm.value.userId
+      })
+
+      // Aller directement à l'étape de sélection de plan si userId est défini
+      if (subscriptionForm.value.userId) {
+        currentStep.value = 'select-plan'
+        console.log('🔵 Set currentStep to select-plan')
+        return
+      }
+    }
+  }
+
+  // Sinon, aller au formulaire de création de compte
+  currentStep.value = 'new-user'
+  console.log('🔵 Set currentStep to new-user')
 })
 
 // Restaurer le plan sélectionné après chargement des plans
+// Seulement si aucun plan n'est déjà sélectionné
 watch(subscriptionPlans, (newPlans) => {
-  if (newPlans.length > 0 && selectedPlanBeforeAuth.value) {
+  console.log('🟡 subscriptionPlans watch triggered, plans count:', newPlans.length)
+  if (newPlans.length > 0 && selectedPlanBeforeAuth.value && !subscriptionForm.value.planId) {
     subscriptionForm.value.planId = selectedPlanBeforeAuth.value
+    console.log('🟡 planId set from selectedPlanBeforeAuth:', selectedPlanBeforeAuth.value)
+  }
+})
+
+// Debug: surveiller les changements de userId et planId
+watch(() => subscriptionForm.value.userId, (newVal, oldVal) => {
+  console.log('🔴 userId changed:', oldVal, '->', newVal)
+  console.trace('userId change stack trace')
+})
+
+watch(() => subscriptionForm.value.planId, (newVal, oldVal) => {
+  console.log('🟢 planId changed:', oldVal, '->', newVal)
+})
+
+watch(currentStep, (newVal, oldVal) => {
+  console.log('🟣 currentStep changed:', oldVal, '->', newVal)
+})
+
+// Mettre à jour selectedPlanDetails quand subscriptionForm.planId change
+watch(() => subscriptionForm.value.planId, (newPlanId) => {
+  if (newPlanId && subscriptionPlans.value.length > 0) {
+    const plan = subscriptionPlans.value.find((p: any) => String(p.id) === String(newPlanId))
+    if (plan) {
+      selectedPlanDetails.value = plan
+      // Sauvegarder le plan dans localStorage
+      localStorage.setItem('selectedPlan', JSON.stringify(plan))
+      console.log('Plan mis à jour:', plan.name)
+    }
   }
 })
 
@@ -605,7 +750,6 @@ const editProfile = () => {
  * Étape 2B: Nouvel utilisateur - Enregistrement
  */
 const handleRegistration = async () => {
-   
   const result = await registerUser(
     subscriptionForm.value.email,
     password.value,
@@ -617,25 +761,39 @@ const handleRegistration = async () => {
   if (result.user) {
     // Compte créé avec succès - sauvegarder les données dans localStorage
     localStorage.setItem('userVerification', JSON.stringify({
-      userId: result.user.id,  // ← Le userId vient de user.id pour register
+      userId: result.user.id,
       email: result.user.email,
       firstName: result.user.firstName,
       lastName: result.user.lastName,
       phone: result.user.phone
     }))
-    
+
     // Sauvegarder le token si nécessaire
     if (result.token) {
       localStorage.setItem('auth_token', result.token)
     }
-    
+
     currentStep.value = 'select-plan'
     // Assurer que les plans sont chargés
     if (subscriptionPlans.value.length === 0) {
       fetchPlans()
     }
+  } else if (result.emailExists) {
+    // L'email existe déjà → rediriger vers le login
+    const pathParts = window.location.pathname.split('/')
+    const locale = ['fr', 'en'].includes(pathParts[1]) ? pathParts[1] : 'fr'
+    // Sauvegarder l'email pour pré-remplir le formulaire de login
+    localStorage.setItem('login_email', subscriptionForm.value.email)
+    router.push(`/${locale}/subscriber/manage?login=true`)
   }
   // Les erreurs s'affichent dans errorMessage
+}
+
+/**
+ * Ouvrir le modal de connexion
+ */
+const goToLogin = () => {
+  emit('open-login-modal')
 }
 
 /**
@@ -685,20 +843,33 @@ const goBackToProfile = () => {
  */
 const completeSubscription = async () => {
   console.log('📝 Finalisation de l\'abonnement après paiement...')
+  console.log('📝 Données du formulaire:', {
+    userId: subscriptionForm.value.userId,
+    planId: subscriptionForm.value.planId,
+    email: subscriptionForm.value.email,
+    transactionId: transactionId
+  })
+
   const subscriptionData = {...subscriptionForm.value, transactionId}
-  
-  // Ajouter l'article sélectionné si c'est un plan mensuel
-  if (selectedPlanDetails.value?.id === monthlyPlan.value && selectedArticle.value) {
-    (subscriptionData as any).articleNumber = selectedArticle.value
-    console.log('📰 Article sélectionné:', selectedArticle.value)
-  }
-  
+
+  console.log('📝 Appel createSubscription avec:', subscriptionData)
   const success = await createSubscription(subscriptionData)
+
   if (success) {
-    console.log('✅ Abonnement créé avec succès!')
-    router.push('/subscriber/success')
+    console.log('✅ Abonnement créé/mis à jour avec succès!')
+    // Nettoyer le localStorage pour forcer un rafraîchissement des données
+    localStorage.removeItem('selectedPlan')
+
+    // Récupérer la locale courante
+    const pathParts = window.location.pathname.split('/')
+    const locale = ['fr', 'en'].includes(pathParts[1]) ? pathParts[1] : 'fr'
+
+    // Rediriger vers l'espace abonné avec un petit délai pour que le backend mette à jour
+    setTimeout(() => {
+      router.push(`/${locale}/subscriber/manage`)
+    }, 500)
   } else {
-    console.error('❌ Erreur lors de la création de l\'abonnement')
+    console.error('❌ Erreur lors de la création/mise à jour de l\'abonnement')
     isPaying.value = false
   }
 }
@@ -740,8 +911,11 @@ const handleCreateSubscription = async () => {
  * Étape 5: Finaliser
  */
 const handleFinish = () => {
-  // Redirection vers le dashboard
-  router.push('/subscriber/success')
+  // Récupérer la locale courante
+  const pathParts = window.location.pathname.split('/')
+  const locale = ['fr', 'en'].includes(pathParts[1]) ? pathParts[1] : 'fr'
+  // Redirection vers l'espace abonné
+  router.push(`/${locale}/subscriber/manage`)
 }
 </script>
 
@@ -815,9 +989,9 @@ const handleFinish = () => {
 
 .form-control:focus {
   outline: none;
-  border-color: var(--cs-brown-color, #8b5c2e);
+  border-color: #d4b128;
   background: white;
-  box-shadow: 0 0 0 3px rgba(139, 92, 46, 0.1);
+  box-shadow: 0 0 0 3px rgba(212, 177, 40, 0.1);
 }
 
 .form-control:disabled {
@@ -875,14 +1049,14 @@ const handleFinish = () => {
 }
 
 .btn-primary {
-  background-color: var(--cs-brown-color, #8b5c2e);
+  background-color: #d4b128;
   color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.3);
+  box-shadow: 0 4px 12px rgba(212, 177, 40, 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 46, 0.4);
+  box-shadow: 0 6px 20px rgba(212, 177, 40, 0.4);
   opacity: 0.9;
 }
 
@@ -910,7 +1084,7 @@ const handleFinish = () => {
 .btn-link {
   background: none;
   border: none;
-  color: var(--cs-brown-color, #8b5c2e);
+  color: #d4b128;
   cursor: pointer;
   padding: 0;
   font-size: 0.875rem;
@@ -922,8 +1096,21 @@ const handleFinish = () => {
   opacity: 0.8;
 }
 
+.login-link-wrapper {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.login-text {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
 .btn-retry {
-  background-color: var(--cs-brown-color, #8b5c2e);
+  background-color: #d4b128;
   color: white;
   padding: 0.5rem 1rem;
   border: none;
@@ -967,15 +1154,120 @@ const handleFinish = () => {
   border: 1px solid #86efac;
 }
 
+.alert-warning {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.input-warning {
+  border-color: #f59e0b !important;
+  background-color: #fffbeb !important;
+}
+
+.email-checking {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.btn-link-warning {
+  background: none;
+  border: none;
+  color: #d4b128;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 0.5rem;
+  font-size: 0.875rem;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.btn-link-warning:hover {
+  color: #b89a22;
+}
+
+/* Section justificatif étudiant */
+.student-proof-section {
+  background: linear-gradient(135deg, #f3e8ff 0%, #faf5ff 100%);
+  border: 2px solid #9E73B0;
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 2rem 0;
+}
+
+.upload-zone {
+  position: relative;
+  border: 2px dashed #9E73B0;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  background: white;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.upload-zone:hover {
+  border-color: #7B1FA2;
+  background: #faf5ff;
+}
+
+.upload-zone.has-file {
+  border-style: solid;
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.file-input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  color: #7B1FA2;
+  cursor: pointer;
+}
+
+.upload-label .success-icon {
+  color: #10b981;
+}
+
+.upload-label span {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.upload-label small {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  font-weight: normal;
+}
+
+.file-name {
+  color: #10b981 !important;
+}
+
 /* ========== INFO BOX ========== */
 .info-box {
   background: linear-gradient(135deg, #fef7f0 0%, #fef3e7 100%);
-  border-left: 4px solid var(--cs-brown-color, #8b5c2e);
+  border-left: 4px solid #d4b128;
   padding: 1rem;
   margin-top: 1.5rem;
   border-radius: 8px;
   font-size: 0.875rem;
-  color: #8b5c2e;
+  color: #d4b128;
 }
 
 .info-box p {
@@ -989,7 +1281,7 @@ const handleFinish = () => {
 
 .selected-plan-card {
   background: linear-gradient(135deg, #fef7f0 0%, #fef3e7 100%);
-  border: 3px solid var(--cs-brown-color, #8b5c2e);
+  border: 3px solid #d4b128;
   border-radius: 12px;
   padding: 2rem;
   margin-bottom: 2rem;
@@ -998,7 +1290,7 @@ const handleFinish = () => {
 
 .plan-badge {
   display: inline-block;
-  background-color: var(--cs-brown-color, #8b5c2e);
+  background-color: #d4b128;
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 20px;
@@ -1026,7 +1318,7 @@ const handleFinish = () => {
   gap: 2rem;
   margin-bottom: 1.5rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(139, 92, 46, 0.1);
+  border-bottom: 1px solid rgba(212, 177, 40, 0.1);
 }
 
 .plan-details .detail {
@@ -1052,7 +1344,7 @@ const handleFinish = () => {
 
 .plan-details .value {
   font-size: 1.25rem;
-  color: var(--cs-brown-color, #8b5c2e);
+  color: #d4b128;
   font-weight: 700;
 }
 
@@ -1150,8 +1442,8 @@ const handleFinish = () => {
 }
 
 .checkbox-input:checked ~ .checkbox-custom {
-  background-color: var(--cs-brown-color, #8b5c2e);
-  border-color: var(--cs-brown-color, #8b5c2e);
+  background-color: #d4b128;
+  border-color: #d4b128;
 }
 
 .checkbox-input:checked ~ .checkbox-custom::after {
@@ -1184,15 +1476,15 @@ const handleFinish = () => {
 }
 
 .plan-card:hover {
-  border-color: var(--cs-brown-color, #8b5c2e);
-  box-shadow: 0 8px 24px rgba(139, 92, 46, 0.15);
+  border-color: #d4b128;
+  box-shadow: 0 8px 24px rgba(212, 177, 40, 0.15);
   transform: translateY(-4px);
 }
 
 .plan-card.selected {
-  border-color: var(--cs-brown-color, #8b5c2e);
+  border-color: #d4b128;
   background: linear-gradient(135deg, #fef7f0 0%, #fef3e7 100%);
-  box-shadow: 0 8px 24px rgba(139, 92, 46, 0.2);
+  box-shadow: 0 8px 24px rgba(212, 177, 40, 0.2);
 }
 
 .plan-header {
@@ -1231,7 +1523,7 @@ const handleFinish = () => {
 .amount {
   font-size: 1.75rem;
   font-weight: 800;
-  color: var(--cs-brown-color, #8b5c2e);
+  color: #d4b128;
   display: block;
 }
 
@@ -1285,14 +1577,14 @@ const handleFinish = () => {
 }
 
 .btn-select:hover {
-  border-color: var(--cs-brown-color, #8b5c2e);
-  color: var(--cs-brown-color, #8b5c2e);
+  border-color: #d4b128;
+  color: #d4b128;
 }
 
 .btn-select.selected {
-  background-color: var(--cs-brown-color, #8b5c2e);
+  background-color: #d4b128;
   color: white;
-  border-color: var(--cs-brown-color, #8b5c2e);
+  border-color: #d4b128;
 }
 
 /* ========== LOADING STATE ========== */
@@ -1306,7 +1598,7 @@ const handleFinish = () => {
   width: 40px;
   height: 40px;
   border: 4px solid #f3f4f6;
-  border-top: 4px solid var(--cs-brown-color, #8b5c2e);
+  border-top: 4px solid #d4b128;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -1371,7 +1663,7 @@ const handleFinish = () => {
 .detail-item {
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(139, 92, 46, 0.1);
+  border-bottom: 1px solid rgba(212, 177, 40, 0.1);
 }
 
 .detail-item:last-child {
@@ -1460,15 +1752,15 @@ const handleFinish = () => {
 }
 
 .article-option:hover {
-  border-color: var(--cs-brown-color, #8b5c2e);
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.1);
+  border-color: #d4b128;
+  box-shadow: 0 4px 12px rgba(212, 177, 40, 0.1);
   transform: translateX(4px);
 }
 
 .article-option.selected {
-  border-color: var(--cs-brown-color, #8b5c2e);
+  border-color: #d4b128;
   background: linear-gradient(135deg, #fef7f0 0%, #fef3e7 100%);
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.2);
+  box-shadow: 0 4px 12px rgba(212, 177, 40, 0.2);
 }
 
 .article-radio {
@@ -1490,7 +1782,7 @@ const handleFinish = () => {
   position: absolute;
   width: 8px;
   height: 8px;
-  background-color: var(--cs-brown-color, #8b5c2e);
+  background-color: #d4b128;
   border-radius: 50%;
   top: 50%;
   left: 50%;
@@ -1519,7 +1811,7 @@ const handleFinish = () => {
   text-align: right;
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--cs-brown-color, #8b5c2e);
+  color: #d4b128;
 }
 
 /* ========== UTILITIES ========== */

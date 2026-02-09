@@ -8,7 +8,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBaseUrl: process.env.API_BASE_URL || 'https://nextapi.coumbassa-sanden.com',
-      apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://altnews-sub.altdigit.africa/api/',
+      apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://nextapi.coumbassa-sanden.com/api/',
     }
     //http://213.199.36.68:5020
   },
@@ -48,6 +48,15 @@ export default defineNuxtConfig({
     // }
     head: {
       script: [
+        // Google Tag Manager
+        {
+          innerHTML: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+          new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+          j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+          'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+          })(window,document,'script','dataLayer','GTM-WMX8QZBN');`,
+          type: 'text/javascript',
+        },
         { src: '/js/vendor/jquery.js',},
         { src: '/js/bootstrap-bundle.js', defer: true },
         { src: '/js/swiper-bundle.js', defer: true },
@@ -130,7 +139,20 @@ export default defineNuxtConfig({
         en: '/contact',
         fr: '/contact'
       },
+      'subscriber-manage': {
+        en: '/subscriber/manage',
+        fr: '/subscriber/manage'
+      },
+      'subscriber-reset-password': {
+        en: '/subscriber/reset-password',
+        fr: '/subscriber/reset-password'
+      },
+      'subscriber-success': {
+        en: '/subscriber/success',
+        fr: '/subscriber/success'
+      },
     }
   },
-  modules: ['@nuxtjs/i18n', 'nuxt-swiper', '@pinia/nuxt']
+  modules: ['@nuxtjs/i18n', 'nuxt-swiper', '@pinia/nuxt'],
+  plugins: ['~/plugins/gtm.client.ts']
 })

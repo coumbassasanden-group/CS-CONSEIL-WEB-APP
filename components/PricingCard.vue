@@ -18,11 +18,11 @@
       <h3 v-if="plan.price === 0" class="plan-name">Gratuit</h3>
       <h3 v-else class="plan-name">{{ plan.name }}</h3>
       <div class="plan-price">
-        <span v-if="plan.price === 0" class="free-text">{{ plan.name }}</span>
+        <span v-if="plan.price === 0" class="free-text limited-text">Limité</span>
         <template v-else>
           <span class="amount">{{ formatPrice(plan.price) }}</span>
           <span class="currency">FCFA</span>
-          <span v-if="plan.duration && plan.id === 'e5e96924-1045-4315-9257-c7cc7e11532c'" class="period">
+          <span v-if="plan.duration && plan.duration > 0" class="period">
             / {{ getPeriodLabel(plan.duration?.toString()) }}
           </span>
         </template>
@@ -126,12 +126,12 @@ const getPeriodLabel = (period: string) => {
 }
 
 .pricing-card.selected {
-  border-color: var(--cs-brown-color);
-  box-shadow: 0 8px 30px rgba(139, 92, 46, 0.3);
+  border-color: #d4b128;
+  box-shadow: 0 8px 30px rgba(212, 177, 40, 0.3);
 }
 
 .pricing-card.popular {
-  border-color: var(--cs-brown-color);
+  border-color: #d4b128;
   background: linear-gradient(135deg, #fef7f0 0%, #ffffff 100%);
 }
 
@@ -139,13 +139,13 @@ const getPeriodLabel = (period: string) => {
   position: absolute;
   top: -12px;
   right: 20px;
-  background: var(--cs-brown-color);
+  background: #d4b128;
   color: white;
   padding: 0.4rem 1.2rem;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.4);
+  box-shadow: 0 4px 12px rgba(212, 177, 40, 0.4);
 }
 
 .pricing-header {
@@ -184,7 +184,7 @@ const getPeriodLabel = (period: string) => {
 .currency {
   font-size: 1.2rem;
   font-weight: 600;
-  color: var(--cs-brown-color);
+  color: #d4b128;
   margin-left: 0.2rem;
 }
 
@@ -227,13 +227,19 @@ const getPeriodLabel = (period: string) => {
   justify-content: center;
   width: 20px;
   height: 20px;
-  background: #d1fae5;
-  color: #059669;
+  background: rgba(212, 177, 40, 0.2);
+  color: #d4b128;
   border-radius: 50%;
   font-weight: bold;
   font-size: 0.75rem;
   flex-shrink: 0;
   margin-top: 0.15rem;
+}
+
+.limited-text {
+  color: #d4b128 !important;
+  font-size: 2rem;
+  font-weight: 700;
 }
 
 .pricing-footer {
@@ -249,14 +255,14 @@ const getPeriodLabel = (period: string) => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: var(--cs-brown-color);
+  background: #d4b128;
   color: white;
-  box-shadow: 0 4px 12px rgba(139, 92, 46, 0.3);
+  box-shadow: 0 4px 12px rgba(212, 177, 40, 0.3);
 }
 
 .btn-subscribe:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 46, 0.4);
+  box-shadow: 0 6px 20px rgba(212, 177, 40, 0.4);
   opacity: 0.9;
 }
 

@@ -220,7 +220,7 @@
             "addToCart": "Ajouter au panier",
             "addToCartButton": "Ajouter au panier"
         },
-                "pageTitle": "Papeterie",
+        "pageTitle": "Papeterie",
         "pageDescription": "Découvrez notre sélection de produits de papeterie professionnelle. CS Conseil vous propose une gamme complète pour tous vos besoins.",
         "detailTitle": "{name} - {price}",
         "detailDescription": "Découvrez {name} à {price}. {description}",
@@ -330,5 +330,28 @@
         "404_message": "La page que vous recherchez n'existe pas.",
         "default_message": "Nous rencontrons actuellement des difficultés techniques.",
         "back": "Retour"
+    },
+    "subscription": {
+        "subtitle": "Abonnements ALT News",
+        "title": "Choisissez votre formule",
+        "description": "Accédez à toutes nos éditions ALT News avec nos différentes formules d'abonnement.",
+        "free": {
+            "name": "Gratuit",
+            "description": "Newsletter d'actualités et promotions"
+        },
+        "unit": {
+            "name": "Achat à l'unité",
+            "description": "Accès à une édition spécifique"
+        },
+        "annual": {
+            "name": "Premium Annuel",
+            "description": "Accès aux 12 éditions de l'année"
+        },
+        "student": {
+            "name": "Premium Étudiant",
+            "description": "Tarif réduit pour étudiants"
+        },
+        "subscribe_btn": "Souscrire",
+        "register_btn": "S'inscrire"
     }
 }

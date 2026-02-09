@@ -1,14 +1,131 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
+import { useAuth } from '~/composables/useAuth';
+import LoginModal from '~/components/LoginModal.vue';
+import Cinetpay from '~/components/Cinetpay.vue';
 
 const config = useRuntimeConfig();
 const { locale } = useI18n();
 const { formatDate } = useFormatDate()
 const localePath = useLocalePath();
+const route = useRoute();
+const router = useRouter();
+const { isLoggedIn, getAuthUser } = useAuth();
+
+// Récupérer la locale courante
+const currentLocale = computed(() => {
+    const pathParts = route.path.split('/');
+    const loc = pathParts[1];
+    return ['fr', 'en'].includes(loc) ? loc : 'fr';
+});
+
 const altNews = ref([]);
 const loading = ref(true);
 const error = ref(null);
+
+// État pour le modal de connexion et paiement
+const showLoginModal = ref(false);
+const showPaymentModal = ref(false);
+const selectedEditionForPurchase = ref(null);
+const paymentTransactionId = ref('');
+const paymentPhone = ref('');
+const phoneError = ref('');
+const cinetpayRef = ref(null);
+const UNIT_PRICE = 2000;
+
+// Filtres et recherche
+const activeFilter = ref('all'); // 'all', 'free', 'premium'
+const searchQuery = ref('');
+
+// Pagination
+const currentPage = ref(1);
+const itemsPerPage = ref(9); // 3x3 grid
+
+// Formater le prix
+const formatPrice = (price) => {
+    return new Intl.NumberFormat('fr-FR').format(price);
+};
+
+// Filtrer les éditions
+const filteredNews = computed(() => {
+    let result = altNews.value;
+
+    // Filtre par type
+    if (activeFilter.value === 'free') {
+        result = result.filter(news => news.has_free_version || news.is_free);
+    } else if (activeFilter.value === 'premium') {
+        result = result.filter(news => !news.has_free_version && !news.is_free);
+    }
+
+    // Filtre par recherche
+    if (searchQuery.value.trim()) {
+        const query = searchQuery.value.toLowerCase().trim();
+        result = result.filter(news =>
+            news.title.toLowerCase().includes(query) ||
+            (news.description && news.description.toLowerCase().includes(query))
+        );
+    }
+
+    return result;
+});
+
+// Compteurs pour les filtres
+const filterCounts = computed(() => ({
+    all: altNews.value.length,
+    free: altNews.value.filter(n => n.has_free_version || n.is_free).length,
+    premium: altNews.value.filter(n => !n.has_free_version && !n.is_free).length
+}));
+
+// Pagination computed properties
+const totalPages = computed(() => Math.ceil(filteredNews.value.length / itemsPerPage.value));
+
+const paginatedNews = computed(() => {
+    const start = (currentPage.value - 1) * itemsPerPage.value;
+    const end = start + itemsPerPage.value;
+    return filteredNews.value.slice(start, end);
+});
+
+// Reset page when filters change
+watch([activeFilter, searchQuery], () => {
+    currentPage.value = 1;
+});
+
+// Navigation functions
+const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page;
+        // Scroll to top of editions
+        const element = document.querySelector('.filters-section');
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+};
+
+const prevPage = () => goToPage(currentPage.value - 1);
+const nextPage = () => goToPage(currentPage.value + 1);
+
+// Generate page numbers for display
+const visiblePages = computed(() => {
+    const pages = [];
+    const total = totalPages.value;
+    const current = currentPage.value;
+
+    if (total <= 5) {
+        for (let i = 1; i <= total; i++) pages.push(i);
+    } else {
+        if (current <= 3) {
+            pages.push(1, 2, 3, 4, '...', total);
+        } else if (current >= total - 2) {
+            pages.push(1, '...', total - 3, total - 2, total - 1, total);
+        } else {
+            pages.push(1, '...', current - 1, current, current + 1, '...', total);
+        }
+    }
+    return pages;
+});
 
 const fetchAltNews = async () => {
     loading.value = true;
@@ -39,26 +156,166 @@ const fetchAltNews = async () => {
 onMounted(() => {
     fetchAltNews();
 });
+
+// ===== Logique d'achat d'édition =====
+
+// Générer un ID de transaction unique
+const generateTransactionId = () => {
+    return 'ALT-ED-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+};
+
+// Vérifier si le téléphone est valide
+const isPhoneValid = computed(() => {
+    const phone = paymentPhone.value.trim();
+    return phone.length >= 8;
+});
+
+// Clic sur "Acheter ce numéro"
+const handleBuyEdition = (edition) => {
+    selectedEditionForPurchase.value = edition;
+
+    if (!isLoggedIn()) {
+        // Pas connecté → afficher le modal de connexion
+        showLoginModal.value = true;
+    } else {
+        // Connecté → afficher le modal de paiement
+        openPaymentModal();
+    }
+};
+
+// Ouvrir le modal de paiement
+const openPaymentModal = () => {
+    paymentTransactionId.value = generateTransactionId();
+    const user = getAuthUser();
+    paymentPhone.value = user?.phone || '';
+    phoneError.value = '';
+    showPaymentModal.value = true;
+};
+
+// Fermer le modal de paiement
+const closePaymentModal = () => {
+    showPaymentModal.value = false;
+    selectedEditionForPurchase.value = null;
+    paymentPhone.value = '';
+    phoneError.value = '';
+};
+
+// Callback après connexion réussie
+const onLoginSuccess = (user) => {
+    showLoginModal.value = false;
+    // Après connexion, ouvrir le modal de paiement
+    if (selectedEditionForPurchase.value) {
+        nextTick(() => {
+            openPaymentModal();
+        });
+    }
+};
+
+// Callback pour inscription
+const onRegisterClick = () => {
+    showLoginModal.value = false;
+    // Rediriger vers la page d'abonnement avec l'édition en paramètre
+    const editionId = selectedEditionForPurchase.value?.id;
+    if (editionId) {
+        localStorage.setItem('pendingEditionPurchase', JSON.stringify({
+            edition: selectedEditionForPurchase.value,
+            returnUrl: route.fullPath
+        }));
+    }
+    router.push(`/${currentLocale.value}/subscriber`);
+};
+
+// Lancer le paiement
+const startPayment = () => {
+    const phone = paymentPhone.value.trim();
+
+    if (!phone) {
+        phoneError.value = 'Veuillez entrer votre numéro de téléphone';
+        return;
+    }
+
+    if (phone.length < 8) {
+        phoneError.value = 'Le numéro doit contenir au moins 8 chiffres';
+        return;
+    }
+
+    phoneError.value = '';
+
+    // Sauvegarder les données de l'achat en attente
+    const pendingPurchase = {
+        edition: selectedEditionForPurchase.value,
+        transactionId: paymentTransactionId.value,
+        amount: UNIT_PRICE,
+        phone: phone,
+        timestamp: Date.now()
+    };
+    localStorage.setItem('pendingEditionPurchase', JSON.stringify(pendingPurchase));
+
+    // Lancer CinetPay
+    if (cinetpayRef.value) {
+        cinetpayRef.value.checkout(handlePaymentSuccess);
+    }
+};
+
+// Callback après paiement réussi
+const handlePaymentSuccess = () => {
+    const pendingData = localStorage.getItem('pendingEditionPurchase');
+    if (!pendingData) return;
+
+    try {
+        const pending = JSON.parse(pendingData);
+        const edition = pending.edition;
+
+        // Ajouter l'édition aux achats
+        let purchasedEditions = [];
+        const storedEditions = localStorage.getItem('purchasedEditions');
+        if (storedEditions) {
+            purchasedEditions = JSON.parse(storedEditions);
+        }
+
+        // Vérifier si déjà acheté
+        if (!purchasedEditions.some(e => e.id === edition.id)) {
+            purchasedEditions.push({
+                ...edition,
+                purchaseDate: new Date().toISOString(),
+                transactionId: pending.transactionId
+            });
+            localStorage.setItem('purchasedEditions', JSON.stringify(purchasedEditions));
+        }
+
+        // Ajouter à l'historique des paiements
+        let paymentHistory = [];
+        const storedPayments = localStorage.getItem('paymentHistory');
+        if (storedPayments) {
+            paymentHistory = JSON.parse(storedPayments);
+        }
+        paymentHistory.push({
+            id: paymentHistory.length + 1,
+            date: new Date().toISOString(),
+            description: `Achat édition: ${edition.title}`,
+            amount: pending.amount,
+            type: 'single',
+            status: 'completed',
+            transactionId: pending.transactionId
+        });
+        localStorage.setItem('paymentHistory', JSON.stringify(paymentHistory));
+
+        // Nettoyer
+        localStorage.removeItem('pendingEditionPurchase');
+        closePaymentModal();
+
+        // Rediriger vers l'espace abonné
+        router.push(`/${currentLocale.value}/subscriber/manage`);
+
+    } catch (e) {
+        console.error('Erreur lors de la confirmation de l\'achat:', e);
+    }
+};
 </script>
 
 <template>
     <div class="tp-project-area tp-project-2-animate-tab  pb-110">
         <div class="container">
-            <!-- Section Title -->
-            <div class="row align-items-end">
-                <div class="col-lg-12">
-                    <div class="tp-project-5-title-wrap text-center mb-55">
-                        <h1 class="fw-500 fs-40 cs-text-brown mb-10 d-inline-block">{{ $t('alt_news.title') }}</h1>
-                        <h2 class="mb-20 fs-xl-32 fs-sm-28 wow img-custom-anim-left cs-text-gold"
-                            data-wow-duration="1.5s" data-wow-delay="0.2s">
-                            {{ $t('alt_news.subtitle') }} <span
-                                class="text-italic fw-400 tp-ff-heading cs-text-brown">{{ $t('alt_news.subtitle_span')
-                                }}</span>
-                        </h2>
-                        <p class="fs-16 text-muted mb-0 max-w-800 mx-auto">{{ $t('alt_news.description') }}</p>
-                    </div>
-                </div>
-            </div>
 
 
             <!-- Loading State -->
@@ -89,16 +346,83 @@ onMounted(() => {
                 </div>
             </div>
 
-            
+            <!-- Filters and Search Bar -->
+            <div v-else class="filters-section mb-40">
+                <div class="row align-items-center">
+                    <div class="col-lg-7 col-md-12 mb-3 mb-lg-0">
+                        <div class="filter-buttons">
+                            <button
+                                @click="activeFilter = 'all'"
+                                :class="['filter-btn', { active: activeFilter === 'all' }]"
+                            >
+                                <i class="fa-solid fa-th-large me-2"></i>
+                                Toutes
+                                <span class="filter-count">{{ filterCounts.all }}</span>
+                            </button>
+                            <button
+                                @click="activeFilter = 'free'"
+                                :class="['filter-btn free', { active: activeFilter === 'free' }]"
+                            >
+                                <i class="fa-solid fa-gift me-2"></i>
+                                Gratuites
+                                <span class="filter-count">{{ filterCounts.free }}</span>
+                            </button>
+                            <button
+                                @click="activeFilter = 'premium'"
+                                :class="['filter-btn premium', { active: activeFilter === 'premium' }]"
+                            >
+                                <i class="fa-solid fa-crown me-2"></i>
+                                Premium
+                                <span class="filter-count">{{ filterCounts.premium }}</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-lg-5 col-md-12">
+                        <div class="search-wrapper">
+                            <i class="fa-solid fa-search search-icon"></i>
+                            <input
+                                type="text"
+                                v-model="searchQuery"
+                                placeholder="Rechercher une édition..."
+                                class="search-input"
+                            />
+                            <button v-if="searchQuery" @click="searchQuery = ''" class="clear-btn">
+                                <i class="fa-solid fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results count -->
+                <div class="results-count mt-3" v-if="filteredNews.length !== altNews.length || searchQuery">
+                    <span v-if="filteredNews.length > 0">
+                        {{ filteredNews.length }} édition{{ filteredNews.length > 1 ? 's' : '' }} trouvée{{ filteredNews.length > 1 ? 's' : '' }}
+                    </span>
+                    <span v-else class="text-muted">Aucun résultat</span>
+                </div>
+            </div>
 
             <!-- Alt News List -->
-            <div v-else class="row">
-                <div v-for="(news, index) in altNews" :key="news.id" class="col-lg-4 col-md-6">
+            <div v-if="!loading && !error" class="row">
+                <div v-for="(news, index) in paginatedNews" :key="news.id" class="col-lg-4 col-md-6">
                     <div class="tp-service-2-wrap p-relative fix mb-30 wow fadeInLeft"
                         :data-wow-delay="`${0.3 + (index * 0.1)}s`" data-wow-duration=".9s">
                         <div class="tp-service-2-thumb tp-round-4">
                             <img class="w-100 tp-round-4" :src="`${config.public.apiBaseUrl}/storage/${news.image}`"
                                 :alt="news.title">
+                            <!-- Badge Gratuit/Premium -->
+                            <div class="edition-badge-container">
+                                <span v-if="news.has_free_version || news.is_free" class="edition-badge free">
+                                    <i class="fa-solid fa-gift me-1"></i> Gratuit
+                                </span>
+                                <span v-else class="edition-badge premium">
+                                    <i class="fa-solid fa-crown me-1"></i> Premium
+                                </span>
+                            </div>
+                            <!-- Prix pour éditions premium -->
+                            <div v-if="!news.has_free_version && !news.is_free" class="edition-price-tag">
+                                {{ formatPrice(news.price || 2000) }} FCFA
+                            </div>
                         </div>
                         <div class="tp-service-2-content p-absolute">
                             <div class="tp-service-2-content-top d-flex align-items-center">
@@ -117,14 +441,34 @@ onMounted(() => {
                                     {{ formatDate(news.date) }}
                                 </span>
                             </div>
+                            <!-- Bouton Acheter pour les éditions Premium -->
+                            <div v-if="!news.has_free_version && !news.is_free" class="edition-buy-button mt-15">
+                                <button
+                                    @click.stop.prevent="handleBuyEdition(news)"
+                                    class="btn-buy-edition"
+                                >
+                                    <i class="fa-solid fa-shopping-cart me-2"></i>
+                                    Acheter ce numéro {{ formatPrice(news.price || 2000) }} FCFA
+                                </button>
+                            </div>
                         </div>
-                        <!-- <div class="date p-2 text-center p-absolute">
-                            
-                        </div> -->
                     </div>
                 </div>
 
-                <!-- Empty State -->
+                <!-- Empty State - No results from filter/search -->
+                <div v-if="filteredNews.length === 0 && altNews.length > 0" class="col-12 text-center py-5">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-search fs-1 text-muted mb-3"></i>
+                        <h4 class="text-muted">Aucune édition trouvée</h4>
+                        <p class="text-muted mb-4">Essayez de modifier vos critères de recherche ou de filtre.</p>
+                        <button @click="activeFilter = 'all'; searchQuery = ''" class="btn-reset-filters">
+                            <i class="fa-solid fa-rotate-left me-2"></i>
+                            Réinitialiser les filtres
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Empty State - No editions at all -->
                 <div v-if="altNews.length === 0" class="col-12 text-center py-5">
                     <div class="empty-state">
                         <i class="fa-regular fa-folder-open fs-1 text-muted mb-3"></i>
@@ -132,9 +476,123 @@ onMounted(() => {
                         <p class="text-muted">{{ $t('alt_news.empty.description') }}</p>
                     </div>
                 </div>
+
+                <!-- Pagination -->
+                <div v-if="filteredNews.length > itemsPerPage && totalPages > 1" class="col-12">
+                    <div class="pagination-container">
+                        <div class="pagination-info">
+                            Affichage de {{ (currentPage - 1) * itemsPerPage + 1 }} à {{ Math.min(currentPage * itemsPerPage, filteredNews.length) }} sur {{ filteredNews.length }} éditions
+                        </div>
+                        <div class="pagination-controls">
+                            <button
+                                @click="prevPage"
+                                :disabled="currentPage === 1"
+                                class="pagination-btn prev"
+                            >
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </button>
+                            <template v-for="(page, index) in visiblePages" :key="index">
+                                <span v-if="page === '...'" class="pagination-ellipsis">...</span>
+                                <button
+                                    v-else
+                                    @click="goToPage(page)"
+                                    :class="['pagination-btn', { active: currentPage === page }]"
+                                >
+                                    {{ page }}
+                                </button>
+                            </template>
+                            <button
+                                @click="nextPage"
+                                :disabled="currentPage === totalPages"
+                                class="pagination-btn next"
+                            >
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Modal de connexion -->
+    <LoginModal
+        v-model="showLoginModal"
+        @login-success="onLoginSuccess"
+        @register-click="onRegisterClick"
+    />
+
+    <!-- Modal de paiement -->
+    <Teleport to="body">
+        <div v-if="showPaymentModal" class="payment-modal-overlay" @click.self="closePaymentModal">
+            <div class="payment-modal">
+                <button class="modal-close" @click="closePaymentModal">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+
+                <div class="modal-header-payment">
+                    <i class="fa-solid fa-cart-shopping modal-icon"></i>
+                    <h2>Acheter cette édition</h2>
+                </div>
+
+                <div class="modal-body-payment">
+                    <div v-if="selectedEditionForPurchase" class="edition-preview">
+                        <img :src="`${config.public.apiBaseUrl}/storage/${selectedEditionForPurchase.image}`" :alt="selectedEditionForPurchase.title" />
+                        <div class="edition-info">
+                            <h3>{{ selectedEditionForPurchase.title }}</h3>
+                            <p class="edition-price-modal">{{ formatPrice(selectedEditionForPurchase.price || UNIT_PRICE) }} FCFA</p>
+                        </div>
+                    </div>
+
+                    <!-- Champ téléphone -->
+                    <div class="phone-input-wrapper">
+                        <label for="phone" class="phone-label">
+                            <i class="fa-solid fa-phone me-2"></i>Numéro de téléphone
+                        </label>
+                        <input
+                            type="tel"
+                            id="phone"
+                            v-model="paymentPhone"
+                            placeholder="Ex: 0701020304"
+                            class="phone-input"
+                            :class="{ 'has-error': phoneError }"
+                        />
+                        <p v-if="phoneError" class="phone-error">{{ phoneError }}</p>
+                    </div>
+
+                    <div class="payment-summary">
+                        <div class="summary-row">
+                            <span>Prix de l'édition</span>
+                            <span>{{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA</span>
+                        </div>
+                        <div class="summary-row total">
+                            <span>Total à payer</span>
+                            <span>{{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA</span>
+                        </div>
+                    </div>
+
+                    <!-- Composant CinetPay caché -->
+                    <Cinetpay
+                        ref="cinetpayRef"
+                        :structure="'CS Conseil'"
+                        :userName="getAuthUser()?.firstName || ''"
+                        :phone="paymentPhone"
+                        :email="getAuthUser()?.email || ''"
+                        :amount="selectedEditionForPurchase?.price || UNIT_PRICE"
+                        :service="`Achat édition ALT News: ${selectedEditionForPurchase?.title || ''}`"
+                        :firstName="getAuthUser()?.firstName || ''"
+                        :lastName="getAuthUser()?.lastName || ''"
+                        :transactionId="paymentTransactionId"
+                    />
+
+                    <button @click="startPayment" class="btn-pay" :disabled="!isPhoneValid">
+                        <i class="fa-solid fa-credit-card me-2"></i>
+                        Payer {{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <style scoped>
@@ -173,12 +631,57 @@ onMounted(() => {
 .tp-service-2-thumb {
     /* width: 415px; */
     height: 550px;
+    position: relative;
 }
 
 .tp-service-2-thumb img {
     object-fit: fill;
     width: 100%;
     height: 100%;
+}
+
+/* Badge Gratuit/Premium */
+.edition-badge-container {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    z-index: 10;
+}
+
+.edition-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(5px);
+}
+
+.edition-badge.free {
+    background: linear-gradient(135deg, #9E73B0, #7B1FA2);
+    color: white;
+}
+
+.edition-badge.premium {
+    background: #d4b128;
+    color: white;
+}
+
+/* Prix pour éditions premium */
+.edition-price-tag {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    backdrop-filter: blur(5px);
+    z-index: 10;
 }
 
 
@@ -203,6 +706,517 @@ onMounted(() => {
 @keyframes spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+/* Filters Section */
+.filters-section {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.filter-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 50px;
+    background: white;
+    color: #6b7280;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-btn:hover {
+    border-color: #d4b128;
+    color: #d4b128;
+}
+
+.filter-btn.active {
+    background: #d4b128;
+    border-color: #d4b128;
+    color: white;
+}
+
+.filter-btn.free.active {
+    background: linear-gradient(135deg, #9E73B0, #7B1FA2);
+    border-color: #9E73B0;
+}
+
+.filter-btn.premium.active {
+    background: #d4b128;
+    border-color: #d4b128;
+}
+
+.filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 0.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+}
+
+.filter-btn.active .filter-count {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* Search */
+.search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.search-wrapper .search-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+}
+
+.search-wrapper .search-input {
+    width: 100%;
+    padding: 0.875rem 2.5rem 0.875rem 2.75rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    background: #f9fafb;
+    transition: all 0.3s ease;
+}
+
+.search-wrapper .search-input:focus {
+    outline: none;
+    border-color: #d4b128;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(212, 177, 40, 0.1);
+}
+
+.search-wrapper .search-input::placeholder {
+    color: #9ca3af;
+}
+
+.clear-btn {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #e5e7eb;
+    border: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #6b7280;
+    transition: all 0.2s ease;
+}
+
+.clear-btn:hover {
+    background: #d1d5db;
+    color: #374151;
+}
+
+.results-count {
+    font-size: 0.9rem;
+    color: #d4b128;
+    font-weight: 600;
+}
+
+.btn-reset-filters {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background: #d4b128;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-reset-filters:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.3);
+}
+
+@media (max-width: 768px) {
+    .filter-buttons {
+        justify-content: center;
+    }
+
+    .filter-btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Pagination */
+.pagination-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 3rem;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.pagination-info {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 0.75rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 10px;
+    background: white;
+    color: #6b7280;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    border-color: #d4b128;
+    color: #d4b128;
+}
+
+.pagination-btn.active {
+    background: #d4b128;
+    border-color: #d4b128;
+    color: white;
+}
+
+.pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-btn.prev,
+.pagination-btn.next {
+    padding: 0 0.5rem;
+}
+
+.pagination-ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    color: #9ca3af;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .pagination-container {
+        padding: 1rem;
+    }
+
+    .pagination-btn {
+        min-width: 36px;
+        height: 36px;
+        font-size: 0.85rem;
+    }
+
+    .pagination-info {
+        font-size: 0.8rem;
+        text-align: center;
+    }
+}
+
+/* ===== Bouton Acheter l'édition ===== */
+.edition-buy-button {
+    margin-top: 12px;
+}
+
+.btn-buy-edition {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.btn-buy-edition:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+    background: linear-gradient(135deg, #059669, #047857);
+}
+
+.btn-buy-edition:active {
+    transform: translateY(0);
+}
+
+/* ===== Modal de Paiement ===== */
+.payment-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 1rem;
+}
+
+.payment-modal {
+    background: white;
+    border-radius: 20px;
+    max-width: 480px;
+    width: 100%;
+    position: relative;
+    animation: modalSlideIn 0.3s ease;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 36px;
+    height: 36px;
+    background: #f3f4f6;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    color: #6b7280;
+    z-index: 10;
+}
+
+.modal-close:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+.modal-header-payment {
+    text-align: center;
+    padding: 2rem 2rem 1rem;
+}
+
+.modal-icon {
+    font-size: 3rem;
+    color: #10b981;
+    margin-bottom: 1rem;
+}
+
+.modal-header-payment h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.modal-body-payment {
+    padding: 0 2rem 2rem;
+}
+
+.edition-preview {
+    display: flex;
+    gap: 1.25rem;
+    padding: 1.25rem;
+    background: #f9fafb;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.edition-preview img {
+    width: 80px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.edition-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.edition-info h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 0.5rem;
+}
+
+.edition-price-modal {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #10b981;
+    margin: 0;
+}
+
+.phone-input-wrapper {
+    margin-bottom: 1.5rem;
+}
+
+.phone-label {
+    display: flex;
+    align-items: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.phone-input {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.phone-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.phone-input.has-error {
+    border-color: #ef4444;
+}
+
+.phone-input::placeholder {
+    color: #9ca3af;
+}
+
+.phone-error {
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    color: #ef4444;
+}
+
+.payment-summary {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    font-size: 0.95rem;
+    color: #6b7280;
+}
+
+.summary-row.total {
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+    border-top: 2px solid #e5e7eb;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.btn-pay {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-pay:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+}
+
+.btn-pay:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+    .edition-preview {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .edition-preview img {
+        width: 100px;
+        height: 130px;
+    }
+
+    .btn-buy-edition {
+        font-size: 0.85rem;
+        padding: 0.65rem 1rem;
     }
 }
 </style>
