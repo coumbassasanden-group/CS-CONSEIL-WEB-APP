@@ -38,7 +38,7 @@ const props = defineProps({
 .tp-breadcrumb-area {
     background-size: contain !important;
     background-repeat: no-repeat !important;
-    background-position: center !important;
+    background-position: center top !important;
 }
 
 .title {
