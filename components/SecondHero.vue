@@ -35,7 +35,11 @@ const props = defineProps({
 
 <style scoped>
 
-
+.tp-breadcrumb-area {
+    background-size: contain !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+}
 
 .title {
     font-family: var(--cs-family-montserrat);
