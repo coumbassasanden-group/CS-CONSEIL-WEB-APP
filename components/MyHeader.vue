@@ -115,6 +115,11 @@ onUnmounted(() => {
                                 {{ $t('header.alt-news') }}
                             </NuxtLink>
                         </li>
+                        <li @click="closeOffcanvas">
+                            <a href="#" @click="showDevelopmentAlert">
+                                {{ $t('header.official') }}
+                            </a>
+                        </li>
                     </ul>
                 </nav>
             </div>
@@ -192,14 +197,14 @@ onUnmounted(() => {
 
         <!-- tp-header-area-start -->
         <div class="tp-header-area tp-header-2-wrap">
-            <div class="tp-header-3-top tp-header-4-top d-none d-xl-block cs-bg-dark">
+            <div class="tp-header-3-top tp-header-4-top d-none d-xl-block cs-bg-dark" style="min-height: 40px;">
 
             </div>
             <div id="header-sticky" class="tp-header-2-main tp-header-lg-space p-relative">
-                <div class="container container-1690">
-                    <div class="row align-items-center">
+                <div class="container-fluid px-xl-4">
+                    <div class="row align-items-center gx-2">
                         <!-- Logo - responsive width -->
-                        <div class="col-xxl-2 col-xl-2 col-lg-3 col-md-3 col-sm-3 col-4">
+                        <div class="col-auto">
                             <div class="tp-header-left">
                                 <div class="tp-header-logo">
                                     <NuxtLink :to="localePath('index')">
@@ -212,10 +217,10 @@ onUnmounted(() => {
                             </div>
                         </div>
                         <!-- Navigation and controls -->
-                        <div class="col-xxl-10 col-xl-10 col-lg-9 col-md-9 col-sm-9 col-8">
+                        <div class="col">
                             <div class="tp-header-2-right d-flex align-items-center justify-content-end">
-                                <!-- Desktop Menu - Only on screens 1400px and above -->
-                                <div class="tp-main-menu d-none" :class="{'d-xxl-block': true}">
+                                <!-- Desktop Menu - Only on screens 1200px and above -->
+                                <div class="tp-main-menu d-none d-xl-block me-auto ms-xl-3">
                                     <nav class="nav">
                                         <ul class="compact-menu">
                                             <li v-for="item in menuItems" :key="item.path">
@@ -238,6 +243,11 @@ onUnmounted(() => {
                                                     {{ $t('header.alt-news') }}
                                                 </NuxtLink>
                                             </li>
+                                            <li>
+                                                <a href="#" @click="showDevelopmentAlert">
+                                                    {{ $t('header.official') }}
+                                                </a>
+                                            </li>
                                         </ul>
                                     </nav>
                                 </div>
@@ -245,7 +255,7 @@ onUnmounted(() => {
                                 <!-- Header Controls -->
                                 <div class="tp-header-contact d-flex align-items-center justify-content-end">
                                     <!-- Contact Button - Only on very large screens when menu is visible -->
-                                    <div class="tp-header-2-btn d-none" :class="{'d-xxl-inline-block': true}">
+                                    <div class="tp-header-2-btn d-none" :class="{'d-xl-inline-block': true}">
                                         <NuxtLink :to="localePath('contact')"
                                             :class="['tp-btn-compact d-inline-block lh-0 tp-round-24 contact-btn ls-0 tp-btn-switch-animation tp-text-theme-primary fw-500', setActive(localePath('contact'))]">
                                             <span class="d-flex align-items-center justify-content-center">
@@ -275,7 +285,7 @@ onUnmounted(() => {
                                     </div>
                                     
                                     <!-- Mobile Menu Button - Visible when desktop menu is hidden -->
-                                    <div class="tp-header-sidebar-menu d-inline-block" :class="{'d-xxl-none': true}">
+                                    <div class="tp-header-sidebar-menu d-inline-block" :class="{'d-xl-none': true}">
                                         <button @click="toggleOffcanvas"
                                             class="tp-menu-bar tp-header-sidebar-btn border-full-1 rounded-circle lh-1">
                                             <svg width="18" height="16" viewBox="0 0 18 16" fill="none"
@@ -301,14 +311,20 @@ onUnmounted(() => {
 <style scoped>
 /* Logo responsive */
 .responsive-logo {
-    width: 168px;
+    width: 120px;
     height: auto;
     max-width: 100%;
 }
 
-@media (max-width: 1399.98px) {
+@media (min-width: 1400px) {
     .responsive-logo {
         width: 150px;
+    }
+}
+
+@media (min-width: 1600px) {
+    .responsive-logo {
+        width: 168px;
     }
 }
 
@@ -324,10 +340,26 @@ onUnmounted(() => {
     }
 }
 
+/* Header logo positioning */
+.tp-header-logo {
+    padding-left: 0 !important;
+}
+
+.tp-header-left {
+    padding-left: 0 !important;
+}
+
 /* Contact button - Desktop version with more padding */
 .tp-btn-compact {
-    font-size: 14px !important;
-    padding: 0.7rem 1.5rem !important;
+    font-size: 13px !important;
+    padding: 0.6rem 1.2rem !important;
+}
+
+@media (min-width: 1400px) {
+    .tp-btn-compact {
+        font-size: 14px !important;
+        padding: 0.7rem 1.5rem !important;
+    }
 }
 
 /* Contact button mobile (offcanvas) - Same style as desktop */
@@ -471,14 +503,53 @@ onUnmounted(() => {
 /* Navigation - Compact menu */
 .compact-menu {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.15rem;
     flex-wrap: nowrap;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
 .compact-menu li a {
-    padding: 0.4rem 0.8rem !important;
-    font-size: 14px !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 13px !important;
     white-space: nowrap;
+}
+
+/* Add margin to menu to separate from logo */
+.tp-main-menu.me-auto {
+    flex: 1;
+    max-width: fit-content;
+}
+
+.tp-main-menu.ms-xl-3 {
+    margin-left: 2rem !important;
+}
+
+@media (min-width: 1200px) and (max-width: 1399.98px) {
+    .compact-menu {
+        gap: 0.1rem;
+    }
+    
+    .compact-menu li a {
+        padding: 0.25rem 0.5rem !important;
+        font-size: 12px !important;
+    }
+    
+    .tp-main-menu.ms-xl-3 {
+        margin-left: 1rem !important;
+    }
+}
+
+@media (min-width: 1400px) {
+    .compact-menu li a {
+        padding: 0.35rem 0.7rem !important;
+        font-size: 14px !important;
+    }
+    
+    .tp-main-menu.ms-xl-3 {
+        margin-left: 2.5rem !important;
+    }
 }
 
 nav ul li a {
@@ -502,7 +573,7 @@ nav ul li a:hover {
 /* Language selector - More compact */
 .language-selector {
     position: relative;
-    margin-left: 0.5rem;
+    margin-left: 0.4rem;
     padding: 2px !important;
     z-index: 9999;
 }
@@ -511,7 +582,7 @@ nav ul li a:hover {
     background-color: var(--cs-brown-color);
     border: none;
     color: var(--cs-light-brown-color);
-    padding: 0.5rem 0.7rem;
+    padding: 0.45rem 0.6rem;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -521,15 +592,22 @@ nav ul li a:hover {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     min-width: 45px;
     justify-content: center;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 @media (min-width: 768px) {
     .language-btn {
-        padding: 0.5rem 0.8rem;
+        padding: 0.5rem 0.7rem;
         gap: 0.5rem;
         min-width: auto;
         justify-content: flex-start;
+        font-size: 13px;
+    }
+}
+
+@media (min-width: 1400px) {
+    .language-btn {
+        padding: 0.5rem 0.8rem;
         font-size: 14px;
     }
 }
