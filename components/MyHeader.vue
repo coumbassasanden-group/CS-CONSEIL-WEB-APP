@@ -203,8 +203,8 @@ onUnmounted(() => {
             <div id="header-sticky" class="tp-header-2-main tp-header-lg-space p-relative">
                 <div class="container-fluid px-xl-4">
                     <div class="row align-items-center gx-2">
-                        <!-- Logo - responsive width -->
-                        <div class="col-auto">
+                        <!-- Logo - fixé à gauche -->
+                        <div class="col-auto header-logo-col">
                             <div class="tp-header-left">
                                 <div class="tp-header-logo">
                                     <NuxtLink :to="localePath('index')">
@@ -216,11 +216,11 @@ onUnmounted(() => {
                                 </div>
                             </div>
                         </div>
-                        <!-- Navigation and controls -->
-                        <div class="col">
-                            <div class="tp-header-2-right d-flex align-items-center justify-content-end">
+                        <!-- Navigation and controls - centré -->
+                        <div class="col header-content-col">
+                            <div class="tp-header-2-right d-flex align-items-center justify-content-center">
                                 <!-- Desktop Menu - Only on screens 1200px and above -->
-                                <div class="tp-main-menu d-none d-xl-block me-auto ms-xl-3">
+                                <div class="tp-main-menu d-none d-xl-flex">
                                     <nav class="nav">
                                         <ul class="compact-menu">
                                             <li v-for="item in menuItems" :key="item.path">
@@ -253,7 +253,7 @@ onUnmounted(() => {
                                 </div>
                                 
                                 <!-- Header Controls -->
-                                <div class="tp-header-contact d-flex align-items-center justify-content-end">
+                                <div class="tp-header-contact d-flex align-items-center justify-content-center">
                                     <!-- Contact Button - Only on very large screens when menu is visible -->
                                     <div class="tp-header-2-btn d-none" :class="{'d-xl-inline-block': true}">
                                         <NuxtLink :to="localePath('contact')"
@@ -340,13 +340,41 @@ onUnmounted(() => {
     }
 }
 
-/* Header logo positioning */
+/* Header logo positioning - fixé à gauche */
 .tp-header-logo {
     padding-left: 0 !important;
 }
 
 .tp-header-left {
     padding-left: 0 !important;
+}
+
+.header-logo-col {
+    position: absolute;
+    left: 1rem;
+    z-index: 100;
+}
+
+@media (min-width: 1200px) {
+    .header-logo-col {
+        left: 2rem;
+    }
+}
+
+.header-content-col {
+    padding-left: 180px;
+}
+
+@media (min-width: 1400px) {
+    .header-content-col {
+        padding-left: 200px;
+    }
+}
+
+@media (min-width: 1600px) {
+    .header-content-col {
+        padding-left: 220px;
+    }
 }
 
 /* Contact button - Desktop version with more padding */
@@ -518,12 +546,12 @@ onUnmounted(() => {
 
 /* Add margin to menu to separate from logo */
 .tp-main-menu.me-auto {
-    flex: 1;
-    max-width: fit-content;
+    flex: 0 0 auto;
 }
 
 .tp-main-menu.ms-xl-3 {
     margin-left: 2rem !important;
+    margin-right: 2rem !important;
 }
 
 @media (min-width: 1200px) and (max-width: 1399.98px) {

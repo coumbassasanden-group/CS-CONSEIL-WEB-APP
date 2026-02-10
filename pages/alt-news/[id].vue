@@ -155,11 +155,26 @@ onMounted( async () => {
             <div class="container">
                 <div class="row">
                     <div class="col-lg-4">
-                        <div class="tp-team-details-thumb mb-30 wow img-custom-anim-left" data-wow-duration="1.5s"
+                        <div class="tp-team-details-thumb mb-30 wow img-custom-anim-left p-relative" data-wow-duration="1.5s"
                             data-wow-delay="0.2s">
                             <img class="w-100 tp-round-4 shadow-lg" 
                                  :src="`${config.public.apiBaseUrl}/storage/${altNews.image}`"
                                  alt="Image ALT News">
+                            
+                            <!-- Badge Premium/Gratuit en haut à gauche -->
+                            <div class="badge-type-detail p-absolute">
+                                <span v-if="altNews.title.includes('Premium')" class="badge-premium-detail">
+                                    <i class="fa-solid fa-crown me-2"></i>Premium
+                                </span>
+                                <span v-else class="badge-free-detail">
+                                    <i class="fa-solid fa-gift me-2"></i>Gratuit
+                                </span>
+                            </div>
+                            
+                            <!-- Badge Prix en haut à droite (seulement pour premium) -->
+                            <div v-if="altNews.title.includes('Premium')" class="badge-price-detail p-absolute">
+                                <span class="price-tag-detail">2000 FCFA</span>
+                            </div>
                         </div>
                     </div>
                     <div class="col-lg-8">
@@ -450,6 +465,58 @@ onMounted( async () => {
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+/* Badge Premium/Gratuit pour la page de détail */
+.badge-type-detail {
+    top: 15px;
+    left: 15px;
+    z-index: 10;
+}
+
+.badge-premium-detail {
+    background: linear-gradient(135deg, #d4b128 0%, #f4d03f 100%);
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 25px;
+    font-weight: 700;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.4);
+    font-family: var(--cs-family-montserrat);
+}
+
+.badge-free-detail {
+    background: linear-gradient(135deg, #9e73b0 0%, #b88fd1 100%);
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 25px;
+    font-weight: 700;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(158, 115, 176, 0.4);
+    font-family: var(--cs-family-montserrat);
+}
+
+/* Badge Prix pour la page de détail */
+.badge-price-detail {
+    top: 15px;
+    right: 15px;
+    z-index: 10;
+}
+
+.price-tag-detail {
+    background: #2c2c2c;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: 700;
+    font-size: 16px;
+    display: inline-block;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    font-family: var(--cs-family-montserrat);
 }
 
 /* Responsive */

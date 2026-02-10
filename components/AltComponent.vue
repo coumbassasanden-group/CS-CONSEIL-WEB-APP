@@ -93,9 +93,24 @@ onMounted(() => {
                 <div v-for="(news, index) in altNews" :key="news.id" class="col-lg-4 col-md-6">
                     <div class="tp-service-2-wrap p-relative fix mb-30 wow fadeInLeft"
                         :data-wow-delay="`${0.3 + (index * 0.1)}s`" data-wow-duration=".9s">
-                        <div class="tp-service-2-thumb tp-round-4">
+                        <div class="tp-service-2-thumb tp-round-4 p-relative">
                             <img class="w-100 tp-round-4" :src="`${config.public.apiBaseUrl}/storage/${news.image}`"
                                 :alt="news.title">
+                            
+                            <!-- Badge Premium/Gratuit en haut à gauche -->
+                            <div class="badge-type p-absolute">
+                                <span v-if="news.title.includes('Premium')" class="badge-premium">
+                                    <i class="fa-solid fa-crown me-2"></i>Premium
+                                </span>
+                                <span v-else class="badge-free">
+                                    <i class="fa-solid fa-gift me-2"></i>Gratuit
+                                </span>
+                            </div>
+                            
+                            <!-- Badge Prix en haut à droite (seulement pour premium) -->
+                            <div v-if="news.title.includes('Premium')" class="badge-price p-absolute">
+                                <span class="price-tag">2000 FCFA</span>
+                            </div>
                         </div>
                         <div class="tp-service-2-content p-absolute">
                             <div class="tp-service-2-content-top d-flex align-items-center">
@@ -115,9 +130,15 @@ onMounted(() => {
                                 </span>
                             </div>
                         </div>
-                        <!-- <div class="date p-2 text-center p-absolute">
-                            
-                        </div> -->
+                        
+                        <!-- Bouton d'achat en bas (seulement pour premium) -->
+                        <div v-if="news.title.includes('Premium')" class="purchase-button p-absolute">
+                            <NuxtLink :to="localePath({ name: 'alt-news-id', params: { id: news.id } })"
+                                class="btn-purchase">
+                                <i class="fa-solid fa-cart-shopping me-2"></i>
+                                Acheter ce numéro 2000 FCFA
+                            </NuxtLink>
+                        </div>
                     </div>
                 </div>
 
@@ -176,6 +197,109 @@ onMounted(() => {
     object-fit: fill;
     width: 100%;
     height: 100%;
+}
+
+/* Badge Premium/Gratuit en haut à gauche */
+.badge-type {
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+}
+
+.badge-premium {
+    background: linear-gradient(135deg, #d4b128 0%, #f4d03f 100%);
+    color: #fff;
+    padding: 10px 25px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.4);
+    font-family: var(--cs-family-montserrat);
+}
+
+.badge-free {
+    background: linear-gradient(135deg, #9e73b0 0%, #b88fd1 100%);
+    color: #fff;
+    padding: 10px 25px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(158, 115, 176, 0.4);
+    font-family: var(--cs-family-montserrat);
+}
+
+/* Badge Prix en haut à droite */
+.badge-price {
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+}
+
+.price-tag {
+    background: #2c2c2c;
+    color: #fff;
+    padding: 12px 25px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 18px;
+    display: inline-block;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    font-family: var(--cs-family-montserrat);
+}
+
+/* Bouton d'achat en bas */
+.purchase-button {
+    bottom: 15px;
+    left: 20px;
+    right: 20px;
+    z-index: 10;
+}
+
+.btn-purchase {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+    font-family: var(--cs-family-montserrat);
+    width: 100%;
+    white-space: nowrap;
+}
+
+.btn-purchase:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+    color: #fff;
+}
+
+.btn-purchase i {
+    font-size: 13px;
+}
+
+/* Ajuster la position du contenu pour laisser de la place au bouton */
+.tp-service-2-content {
+    bottom: 80px;
+    padding: 20px 25px 15px 25px !important;
+}
+
+.tp-service-2-content-top {
+    margin-bottom: 10px;
+}
+
+.tp-service-2-content-bottom {
+    padding-top: 10px !important;
 }
 
 
