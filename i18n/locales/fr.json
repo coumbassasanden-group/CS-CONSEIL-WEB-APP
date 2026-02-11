@@ -187,6 +187,14 @@
         "empty": {
             "title": "Aucune actualité trouvée",
             "description": "Il n'y a actuellement aucune actualité disponible."
+        },
+        "presentation": {
+            "monthly_review": "La revue mensuelle ALT NEWS",
+            "premium_description": "La Revue ALT NEWS évolue vers une version premium, abonnez-vous et restez informer des nouvelles parutions.",
+            "subscribe_button": "S'abonner",
+            "login_button": "Accéder à mon espace",
+            "already_account": "Vous avez déjà un compte ?",
+            "login_here": "Connectez-vous ici"
         }
     },
     "stationery": {
@@ -335,6 +343,7 @@
         "subtitle": "Abonnements ALT News",
         "title": "Choisissez votre formule",
         "description": "Accédez à toutes nos éditions ALT News avec nos différentes formules d'abonnement.",
+        "create_account": "Créer votre compte",
         "free": {
             "name": "Gratuit",
             "description": "Newsletter d'actualités et promotions"

@@ -13,7 +13,7 @@ const props = defineProps({
 </script>
 
 <template>
-    <div class="tp-breadcrumb-area tp-breadcrumb-spacing bg-position pt-200" :style="{ backgroundImage: `url(${props.image})` }">
+    <div class="tp-breadcrumb-area tp-breadcrumb-spacing pt-120 pb-40" :style="{ backgroundImage: `url(${props.image})` }">
         <div class="container">
             <div class="row">
                 <div class="col-xl-6 col-lg-7 col-md-10">
@@ -35,7 +35,12 @@ const props = defineProps({
 
 <style scoped>
 
-
+.tp-breadcrumb-area {
+    background-position: center;
+    background-size: 100% auto;
+    background-repeat: no-repeat;
+    margin-top: -20px;
+}
 
 .title {
     font-family: var(--cs-family-montserrat);

@@ -214,8 +214,8 @@ onUnmounted(() => {
                         <!-- Navigation and controls -->
                         <div class="col-xxl-10 col-xl-10 col-lg-9 col-md-9 col-sm-9 col-8">
                             <div class="tp-header-2-right d-flex align-items-center justify-content-end">
-                                <!-- Desktop Menu - Only on screens 1400px and above -->
-                                <div class="tp-main-menu d-none" :class="{'d-xxl-block': true}">
+                                <!-- Desktop Menu - Visible on screens 1200px and above, poussé vers la droite -->
+                                <div class="tp-main-menu d-none d-xl-block ms-auto">
                                     <nav class="nav">
                                         <ul class="compact-menu">
                                             <li v-for="item in menuItems" :key="item.path">
@@ -241,7 +241,7 @@ onUnmounted(() => {
                                             <li>
                                                 <a target="_blank" href=" https://officielimmobilier.net/"
                                                     rel="noopener noreferrer">
-                                                     Officiel de l'immobilier
+                                                     L'officiel de l'immobilier
                                                 </a>
                                             </li>
                                            
@@ -251,8 +251,8 @@ onUnmounted(() => {
                                 
                                 <!-- Header Controls -->
                                 <div class="tp-header-contact d-flex align-items-center justify-content-end">
-                                    <!-- Contact Button - Only on very large screens when menu is visible -->
-                                    <div class="tp-header-2-btn d-none" :class="{'d-xxl-inline-block': true}">
+                                    <!-- Contact Button - Visible on screens 1200px and above when menu is visible -->
+                                    <div class="tp-header-2-btn d-none d-xl-inline-block">
                                         <NuxtLink :to="localePath('contact')"
                                             :class="['tp-btn-compact d-inline-block lh-0 tp-round-24 contact-btn ls-0 tp-btn-switch-animation tp-text-theme-primary fw-500', setActive(localePath('contact'))]">
                                             <span class="d-flex align-items-center justify-content-center">
@@ -281,8 +281,8 @@ onUnmounted(() => {
                                         </div>
                                     </div>
                                     
-                                    <!-- Mobile Menu Button - Visible when desktop menu is hidden -->
-                                    <div class="tp-header-sidebar-menu d-inline-block" :class="{'d-xxl-none': true}">
+                                    <!-- Mobile Menu Button - Visible when desktop menu is hidden (below 1200px) -->
+                                    <div class="tp-header-sidebar-menu d-xl-none">
                                         <button @click="toggleOffcanvas"
                                             class="tp-menu-bar tp-header-sidebar-btn border-full-1 rounded-circle lh-1">
                                             <svg width="18" height="16" viewBox="0 0 18 16" fill="none"
@@ -306,35 +306,40 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* Logo responsive */
+/* Logo responsive - Tailles encore plus réduites pour éviter chevauchement */
 .responsive-logo {
-    width: 168px;
+    width: 120px;
     height: auto;
     max-width: 100%;
+    margin-right: 1.5rem;
 }
 
 @media (max-width: 1399.98px) {
     .responsive-logo {
-        width: 150px;
+        width: 110px;
+        margin-right: 1rem;
     }
 }
 
 @media (max-width: 991.98px) {
     .responsive-logo {
-        width: 140px;
+        width: 100px;
+        margin-right: 0.5rem;
     }
 }
 
 @media (max-width: 575.98px) {
     .responsive-logo {
-        width: 120px;
+        width: 90px;
+        margin-right: 0.3rem;
     }
 }
 
-/* Contact button - Desktop version with more padding */
+/* Contact button - Version desktop plus compacte */
 .tp-btn-compact {
-    font-size: 14px !important;
-    padding: 0.7rem 1.5rem !important;
+    font-size: 13px !important;
+    padding: 0.6rem 1.2rem !important;
+    white-space: nowrap;
 }
 
 /* Contact button mobile (offcanvas) - Same style as desktop */
@@ -475,16 +480,17 @@ onUnmounted(() => {
     font-family: var(--cs-family-montserrat) !important;
 }
 
-/* Navigation - Compact menu */
+/* Navigation - Menu compact avec espacement optimisé */
 .compact-menu {
     display: flex;
-    gap: 1;
+    gap: 0.2rem;
     flex-wrap: nowrap;
+    align-items: center;
 }
 
 .compact-menu li a {
-    padding: 0.4rem 0.8rem !important;
-    font-size: 14px !important;
+    padding: 0.5rem 0.7rem !important;
+    font-size: 13px !important;
     white-space: nowrap;
 }
 
@@ -506,10 +512,10 @@ nav ul li a:hover {
     padding-left: 20px;
 }
 
-/* Language selector - More compact */
+/* Language selector - Version plus compacte */
 .language-selector {
     position: relative;
-    margin-left: 0.5rem;
+    margin-left: 0.3rem;
     padding: 2px !important;
     z-index: 9999;
 }
@@ -518,26 +524,26 @@ nav ul li a:hover {
     background-color: var(--cs-brown-color);
     border: none;
     color: var(--cs-light-brown-color);
-    padding: 0.5rem 0.7rem;
+    padding: 0.5rem 0.6rem;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.3rem;
     font-weight: 500;
     transition: all 0.3s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     min-width: 45px;
     justify-content: center;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 @media (min-width: 768px) {
     .language-btn {
-        padding: 0.5rem 0.8rem;
-        gap: 0.5rem;
+        padding: 0.5rem 0.7rem;
+        gap: 0.4rem;
         min-width: auto;
         justify-content: flex-start;
-        font-size: 14px;
+        font-size: 13px;
     }
 }
 
@@ -627,11 +633,11 @@ nav ul li a:hover {
     font-weight: 400;
 }
 
-/* Prevent wrapping and ensure proper spacing */
+/* Espacement optimisé - Menu poussé vers la droite */
 .tp-header-contact {
     flex-wrap: nowrap;
-    gap: 0.3rem;
-    margin-left: auto;
+    gap: 0.2rem;
+    margin-left: 0.3rem;
 }
 
 .tp-header-2-right {
@@ -639,6 +645,13 @@ nav ul li a:hover {
     flex: 1;
     overflow: visible;
     position: relative;
+    gap: 0.3rem;
+}
+
+/* Pousser le menu principal vers la droite */
+.tp-main-menu {
+    margin-left: auto !important;
+    margin-right: 0.5rem;
 }
 
 /* Force single line layout */
@@ -666,20 +679,67 @@ nav ul li a:hover {
     }
 }
 
-/* Custom breakpoint for problematic range */
+/* Breakpoints optimisés pour différentes résolutions */
 @media (min-width: 1200px) and (max-width: 1399.98px) {
+    .compact-menu {
+        gap: 0.15rem;
+    }
+    
     .compact-menu li a {
-        padding: 0.3rem 0.6rem !important;
-        font-size: 13px !important;
+        padding: 0.4rem 0.6rem !important;
+        font-size: 12px !important;
     }
     
     .language-btn {
-        padding: 0.4rem 0.6rem;
-        font-size: 12px;
+        padding: 0.4rem 0.5rem;
+        font-size: 11px;
+    }
+    
+    .tp-btn-compact {
+        font-size: 12px !important;
+        padding: 0.5rem 1rem !important;
+    }
+    
+    .tp-header-contact {
+        gap: 0.15rem;
+    }
+}
+
+/* Breakpoint pour 100% zoom (1400px-1920px) */
+@media (min-width: 1400px) and (max-width: 1920px) {
+    .compact-menu {
+        gap: 0.2rem;
+    }
+    
+    .compact-menu li a {
+        padding: 0.5rem 0.7rem !important;
+        font-size: 13px !important;
     }
     
     .tp-header-contact {
         gap: 0.2rem;
+    }
+    
+    .tp-btn-compact {
+        font-size: 13px !important;
+        padding: 0.6rem 1.2rem !important;
+    }
+}
+
+/* Pour les très grands écrans (au-delà de 1920px) */
+@media (min-width: 1921px) {
+    .compact-menu {
+        gap: 0.4rem;
+    }
+    
+    .compact-menu li a {
+        padding: 0.6rem 0.9rem !important;
+        font-size: 14px !important;
+    }
+    
+    .tp-btn-compact {
+        font-size: 14px !important;
+        padding: 0.7rem 1.4rem !important;
     }
 }
 

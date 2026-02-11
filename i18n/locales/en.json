@@ -186,6 +186,14 @@
         "empty": {
             "title": "No news found",
             "description": "There are currently no news available."
+        },
+        "presentation": {
+            "monthly_review": "The monthly ALT NEWS review",
+            "premium_description": "The ALT NEWS Review is evolving towards a premium version, subscribe and stay informed of new publications.",
+            "subscribe_button": "Subscribe",
+            "login_button": "Access my space",
+            "already_account": "Already have an account?",
+            "login_here": "Login here"
         }
     },
     "stationery": {
@@ -334,6 +342,7 @@
         "subtitle": "ALT News Subscriptions",
         "title": "Choose your plan",
         "description": "Access all our ALT News editions with our different subscription plans adapted to your needs.",
+        "create_account": "Create your account",
         "free": {
             "name": "Free",
             "description": "News and promotions newsletter"

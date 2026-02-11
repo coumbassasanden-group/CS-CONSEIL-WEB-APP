@@ -35,7 +35,7 @@ onMounted(async () => {
 
 <template>
     <section>
-        <div class="tp-chose-bottom pt-50 pb-5 p-relative z-indexm-1">
+        <div class="tp-chose-bottom pt-20 pb-5 p-relative z-indexm-1">
             <span class="tp-chose-shape-2 p-absolute d-none d-xxl-block">
                 <svg width="73" height="346" viewBox="0 0 73 346" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="-50" cy="123" r="122.5" stroke="#d4b128" stroke-opacity="0.5" />
@@ -57,14 +57,13 @@ onMounted(async () => {
                             
                             <!-- Contenu réel -->
                             <div v-else class="tp-chose-list mb-45 wow img-custom-anim-right" v-if="texts.length >= 2">
-                                <h2 class="form-title">La revue mensuelle ALT NEWS</h2>
-                                <h5 class="text-black" >La Revue ALT NEWS évolue vers une version premium, abonnez-vous et
-restez informer des nouvelles parutions.</h5>
+                                <h2 class="form-title">{{ $t('alt_news.presentation.monthly_review') }}</h2>
+                                <h5 class="text-black">{{ $t('alt_news.presentation.premium_description') }}</h5>
                                 <div class="text-center">
-                                    <button @click="handleSubscribe"  class="subscribe-button">S'abonner</button>
+                                    <button @click="handleSubscribe" class="subscribe-button">{{ $t('alt_news.presentation.subscribe_button') }}</button>
                                     <!-- <p class="text-center mt-3">
-                                        <small>Vous avez déjà un compte ? 
-                                            <button @click="showLoginModal = true" class="link-button">Connectez-vous ici</button>
+                                        <small>{{ $t('alt_news.presentation.already_account') }} 
+                                            <button @click="showLoginModal = true" class="link-button">{{ $t('alt_news.presentation.login_here') }}</button>
                                         </small>
                                     </p> -->
                                 </div>
@@ -107,7 +106,7 @@ restez informer des nouvelles parutions.</h5>
                             <div class="login-button-container">
                                 <button @click="showLoginModal = true" class="login-button">
                                     <i class="fa-solid fa-user me-2"></i>
-                                    Accéder à mon espace
+                                    {{ $t('alt_news.presentation.login_button') }}
                                 </button>
                             </div>
                         </div>
@@ -119,7 +118,7 @@ restez informer des nouvelles parutions.</h5>
                         <div v-if="isSubcribe" class="subscription-modal-overlay" @click.self="isSubcribe = false">
                             <div class="subscription-modal">
                                 <div class="subscription-modal-header">
-                                    <h3>Créer votre compte</h3>
+                                    <h3>{{ $t('subscription.create_account') }}</h3>
                                     <button class="btn-close-modal" @click="isSubcribe = false" type="button">
                                         <span>×</span>
                                     </button>

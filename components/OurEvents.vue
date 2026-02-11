@@ -47,7 +47,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="tp-postbox-area pt-140 pb-85">
+    <div class="tp-postbox-area pt-30 pb-85">
         <div class="container">
             <!-- Title Section -->
             <div class="col-lg-12">

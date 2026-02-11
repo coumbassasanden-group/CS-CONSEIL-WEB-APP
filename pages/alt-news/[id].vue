@@ -80,6 +80,11 @@ interface AltNews {
 
 const { formatDate } = useFormatDate()
 
+// Formater le prix
+const formatPrice = (price) => {
+    return new Intl.NumberFormat('fr-FR').format(price);
+};
+
 const altNews = ref<AltNews>({
     id: 0,
     title: '',
@@ -212,55 +217,12 @@ onMounted( async () => {
         <ThirdHero v-if="String(altNews.title).match(/\d+/g)" :title="`ALT #${String(altNews.title).match(/\d+/g)![0]}`" parentPage="/alt-news" :image="`${config.public.apiBaseUrl}/storage/images_folder/conseil_alt_news_details_hero.jpg`" />
          <ThirdHero v-else title="" parentPage="/alt-news" :image="`${config.public.apiBaseUrl}/storage/images_folder/conseil_alt_news_details_hero.jpg`" />
 
-        <!-- Section d'en-tête -->
-        <div class="tp-team-details-area pt-100">
+        <!-- Message de blocage premium - AFFICHÉ EN PREMIER si pas d'accès -->
+        <div v-if="isPremiumContent && !canAccessContent" class="tp-team-expreance-area pt-100 pb-50">
             <div class="container">
                 <div class="row">
-                    <div class="col-lg-4">
-                        <div class="tp-team-details-thumb mb-30 wow img-custom-anim-left position-relative" data-wow-duration="1.5s"
-                            data-wow-delay="0.2s">
-                            <img class="w-100 tp-round-4 shadow-lg"
-                                 :src="`${config.public.apiBaseUrl}/storage/${altNews.image}`"
-                                 alt="Image ALT News">
-                            <!-- Badge Premium/Gratuit -->
-                            <div class="edition-type-badge">
-                                <span v-if="altNews.is_free" class="badge-free">
-                                    <i class="fa-solid fa-gift me-1"></i> Gratuit
-                                </span>
-                                <span v-else class="badge-premium">
-                                    <i class="fa-solid fa-crown me-1"></i> Premium
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-8">
-                        <div class="tp-team-details-content mb-30">
-                            <h2 class="fw-600 fs-50 ls-m-2 mb-15 wow img-custom-anim-left cs-text-purple cs-ff-montserrat"
-                                data-wow-duration="1.5s" data-wow-delay="0.2s">
-                                {{ altNews.title }}
-                            </h2>
-                            <div class="tp-postbox-meta-item mb-30 d-flex align-items-center">
-                                <span class="cs-text-dark fw-600 fs-18">{{ formatDate(altNews.date) }}</span>
-                                <span v-if="String(altNews.title).match(/\d+/g)" class="cs-badge ms-3">ALT #{{ String(altNews.title).match(/\d+/g)![0] }}</span>
-                            </div>
-                            <div class="mb-40" v-if="altNews.content && canAccessContent">
-                                <div v-html="altNews.content"></div>
-                            </div>
-                            <span v-if="canAccessContent" class="fw-600 fs-16 cs-text-gold p-3 border-bottom">Explorer les détails ci-dessous</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section de timeline améliorée -->
-        <div class="tp-team-expreance-area pb-95">
-            <div class="container">
-                <div class="row">
-                    <!-- Timeline avec points de navigation -->
                     <div class="col-12">
-                        <!-- Message de blocage pour contenu premium non accessible -->
-                        <div v-if="isPremiumContent && !canAccessContent" class="premium-block-message">
+                        <div class="premium-block-message">
                             <div class="premium-block-content">
                                 <div class="premium-block-icon">
                                     <i class="fa-solid fa-lock"></i>
@@ -296,9 +258,68 @@ onMounted( async () => {
                                 </template>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                        <!-- Contenu accessible (gratuit ou utilisateur connecté) -->
-                        <div v-else class="cs-timeline-container">
+        <!-- Section d'en-tête avec image et description -->
+        <div class="tp-team-details-area" :class="isPremiumContent && !canAccessContent ? 'pt-50' : 'pt-100'">
+            <div class="container">
+                <div class="row">
+                    <div class="col-lg-4">
+                        <div class="tp-team-details-thumb mb-30 wow img-custom-anim-left position-relative" data-wow-duration="1.5s"
+                            data-wow-delay="0.2s">
+                            <img class="w-100 tp-round-4 shadow-lg"
+                                 :src="`${config.public.apiBaseUrl}/storage/${altNews.image}`"
+                                 alt="Image ALT News">
+                            <!-- Badge Premium/Gratuit -->
+                            <div class="edition-type-badge">
+                                <span v-if="altNews.is_free" class="badge-free">
+                                    <i class="fa-solid fa-gift me-1"></i> Gratuit
+                                </span>
+                                <span v-else class="badge-premium">
+                                    <i class="fa-solid fa-crown me-1"></i> Premium
+                                </span>
+                            </div>
+                            <!-- Prix pour éditions premium -->
+                            <div v-if="!altNews.is_free" class="edition-price-tag">
+                                {{ formatPrice(altNews.price || 2000) }} FCFA
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-8">
+                        <div class="tp-team-details-content mb-30">
+                            <h2 class="fw-600 fs-50 ls-m-2 mb-15 wow img-custom-anim-left cs-text-purple cs-ff-montserrat"
+                                data-wow-duration="1.5s" data-wow-delay="0.2s">
+                                {{ altNews.title }}
+                            </h2>
+                            <div class="tp-postbox-meta-item mb-30 d-flex align-items-center">
+                                <span class="cs-text-dark fw-600 fs-18">{{ formatDate(altNews.date) }}</span>
+                                <span v-if="String(altNews.title).match(/\d+/g)" class="cs-badge ms-3">ALT #{{ String(altNews.title).match(/\d+/g)![0] }}</span>
+                            </div>
+                            <div class="mb-40" v-if="altNews.content">
+                                <div v-html="altNews.content"></div>
+                            </div>
+                            <span v-if="canAccessContent" class="fw-600 fs-16 cs-text-gold p-3 border-bottom">Explorer les détails ci-dessous</span>
+                            <div v-else-if="isPremiumContent" class="premium-teaser-banner">
+                                <i class="fa-solid fa-lock me-2"></i>
+                                <span>Abonnez-vous pour accéder au contenu complet</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section de timeline améliorée -->
+        <div class="tp-team-expreance-area pb-95">
+            <div class="container">
+                <div class="row">
+                    <!-- Timeline avec points de navigation -->
+                    <div class="col-12">
+                        <!-- Contenu accessible (gratuit ou utilisateur avec accès) -->
+                        <div v-if="canAccessContent" class="cs-timeline-container">
                             <!-- Section Wireframe/iFrame -->
                             <div class="cs-timeline-item" v-if="altNews.iFrame">
                                 <div class="cs-timeline-marker">
@@ -502,6 +523,21 @@ onMounted( async () => {
     box-shadow: 0 4px 15px rgba(212, 177, 40, 0.4);
 }
 
+/* Prix pour éditions premium */
+.edition-price-tag {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    backdrop-filter: blur(5px);
+    z-index: 10;
+}
+
 .explore-banner {
     display: inline-block;
     border: 2px solid var(--cs-gold-color);
@@ -513,6 +549,20 @@ onMounted( async () => {
 .explore-banner:hover {
     background-color: rgba(212, 177, 40, 0.15);
     transform: translateY(-3px);
+}
+
+/* Premium Teaser Banner */
+.premium-teaser-banner {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.8rem 1.5rem;
+    background: linear-gradient(135deg, rgba(212, 177, 40, 0.1), rgba(212, 177, 40, 0.05));
+    border: 2px solid #d4b128;
+    border-radius: 25px;
+    color: #d4b128;
+    font-weight: 600;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.15);
 }
 
 /* Timeline amélioré */

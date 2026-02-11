@@ -69,6 +69,7 @@ const fetchActualite = async () => {
 
     try {
         const actualiteId = route.params.id;
+        console.log('🌐 Fetching news with locale:', locale.value);
         const response = await fetch(`${config.public.apiBaseUrl}/api/news/${actualiteId}`, {
             method: 'GET',
             headers: {
@@ -82,6 +83,7 @@ const fetchActualite = async () => {
         }
 
         const data = await response.json();
+        console.log('📰 News data received:', data);
 
         actualite.value = data;
     } catch (err: any) {
