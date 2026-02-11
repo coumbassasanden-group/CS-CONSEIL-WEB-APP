@@ -241,7 +241,7 @@ onUnmounted(() => {
                                             <li>
                                                 <a target="_blank" href=" https://officielimmobilier.net/"
                                                     rel="noopener noreferrer">
-                                                     L'officiel de l'immobilier
+                                                     {{ $t('header.real_estate_official') }}
                                                 </a>
                                             </li>
                                            

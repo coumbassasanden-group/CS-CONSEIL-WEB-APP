@@ -25,7 +25,8 @@
         "alt-news": "ALT News",
         "alt_connect": "ALT Connect",
         "stationery": "Papeterie",
-        "contact": "Contact"
+        "contact": "Contact",
+        "real_estate_official": "L'Officiel de l'Immobilier"
     },
     "about": {
         "title": "Découvrez-nous",
@@ -195,6 +196,32 @@
             "login_button": "Accéder à mon espace",
             "already_account": "Vous avez déjà un compte ?",
             "login_here": "Connectez-vous ici"
+        },
+        "filters": {
+            "all": "Toutes",
+            "free": "Gratuites",
+            "premium": "Premium",
+            "search_placeholder": "Rechercher une édition...",
+            "results": "édition(s) trouvée(s)",
+            "no_results": "Aucun résultat",
+            "reset_filters": "Réinitialiser les filtres",
+            "no_edition_found": "Aucune édition trouvée",
+            "modify_criteria": "Essayez de modifier vos critères de recherche ou de filtre.",
+            "showing": "Affichage de",
+            "to": "à",
+            "of": "sur",
+            "editions": "éditions"
+        },
+        "purchase": {
+            "buy_edition": "Acheter ce numéro",
+            "buy_modal_title": "Acheter cette édition",
+            "phone_label": "Numéro de téléphone",
+            "phone_placeholder": "Ex: 0701020304",
+            "phone_required": "Veuillez entrer votre numéro de téléphone",
+            "phone_min_length": "Le numéro doit contenir au moins 8 chiffres",
+            "edition_price": "Prix de l'édition",
+            "total_to_pay": "Total à payer",
+            "pay_button": "Payer"
         }
     },
     "stationery": {

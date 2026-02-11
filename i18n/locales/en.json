@@ -25,7 +25,8 @@
         "alt-news": "ALT News",
         "alt_connect": "ALT Connect",
         "stationery": "Stationery",
-        "contact": "Contact"
+        "contact": "Contact",
+        "real_estate_official": "The Real Estate Official"
     },
     "about": {
         "title": "Discover us",
@@ -194,6 +195,32 @@
             "login_button": "Access my space",
             "already_account": "Already have an account?",
             "login_here": "Login here"
+        },
+        "filters": {
+            "all": "All",
+            "free": "Free",
+            "premium": "Premium",
+            "search_placeholder": "Search for an edition...",
+            "results": "edition(s) found",
+            "no_results": "No results",
+            "reset_filters": "Reset filters",
+            "no_edition_found": "No edition found",
+            "modify_criteria": "Try modifying your search or filter criteria.",
+            "showing": "Showing",
+            "to": "to",
+            "of": "of",
+            "editions": "editions"
+        },
+        "purchase": {
+            "buy_edition": "Buy this issue",
+            "buy_modal_title": "Buy this edition",
+            "phone_label": "Phone number",
+            "phone_placeholder": "Ex: 0701020304",
+            "phone_required": "Please enter your phone number",
+            "phone_min_length": "The number must contain at least 8 digits",
+            "edition_price": "Edition price",
+            "total_to_pay": "Total to pay",
+            "pay_button": "Pay"
         }
     },
     "stationery": {

@@ -356,7 +356,7 @@ const handlePaymentSuccess = () => {
                                 :class="['filter-btn', { active: activeFilter === 'all' }]"
                             >
                                 <i class="fa-solid fa-th-large me-2"></i>
-                                Toutes
+                                {{ $t('alt_news.filters.all') }}
                                 <span class="filter-count">{{ filterCounts.all }}</span>
                             </button>
                             <button
@@ -364,7 +364,7 @@ const handlePaymentSuccess = () => {
                                 :class="['filter-btn free', { active: activeFilter === 'free' }]"
                             >
                                 <i class="fa-solid fa-gift me-2"></i>
-                                Gratuites
+                                {{ $t('alt_news.filters.free') }}
                                 <span class="filter-count">{{ filterCounts.free }}</span>
                             </button>
                             <button
@@ -372,7 +372,7 @@ const handlePaymentSuccess = () => {
                                 :class="['filter-btn premium', { active: activeFilter === 'premium' }]"
                             >
                                 <i class="fa-solid fa-crown me-2"></i>
-                                Premium
+                                {{ $t('alt_news.filters.premium') }}
                                 <span class="filter-count">{{ filterCounts.premium }}</span>
                             </button>
                         </div>
@@ -383,7 +383,7 @@ const handlePaymentSuccess = () => {
                             <input
                                 type="text"
                                 v-model="searchQuery"
-                                placeholder="Rechercher une édition..."
+                                :placeholder="$t('alt_news.filters.search_placeholder')"
                                 class="search-input"
                             />
                             <button v-if="searchQuery" @click="searchQuery = ''" class="clear-btn">
@@ -396,9 +396,9 @@ const handlePaymentSuccess = () => {
                 <!-- Results count -->
                 <div class="results-count mt-3" v-if="filteredNews.length !== altNews.length || searchQuery">
                     <span v-if="filteredNews.length > 0">
-                        {{ filteredNews.length }} édition{{ filteredNews.length > 1 ? 's' : '' }} trouvée{{ filteredNews.length > 1 ? 's' : '' }}
+                        {{ filteredNews.length }} {{ $t('alt_news.filters.results') }}
                     </span>
-                    <span v-else class="text-muted">Aucun résultat</span>
+                    <span v-else class="text-muted">{{ $t('alt_news.filters.no_results') }}</span>
                 </div>
             </div>
 
@@ -413,10 +413,10 @@ const handlePaymentSuccess = () => {
                             <!-- Badge Gratuit/Premium -->
                             <div class="edition-badge-container">
                                 <span v-if="news.has_free_version || news.is_free" class="edition-badge free">
-                                    <i class="fa-solid fa-gift me-1"></i> Gratuit
+                                    <i class="fa-solid fa-gift me-1"></i> {{ $t('alt_news.filters.free') }}
                                 </span>
                                 <span v-else class="edition-badge premium">
-                                    <i class="fa-solid fa-crown me-1"></i> Premium
+                                    <i class="fa-solid fa-crown me-1"></i> {{ $t('alt_news.filters.premium') }}
                                 </span>
                             </div>
                             <!-- Prix pour éditions premium -->
@@ -448,7 +448,7 @@ const handlePaymentSuccess = () => {
                                     class="btn-buy-edition"
                                 >
                                     <i class="fa-solid fa-shopping-cart me-2"></i>
-                                    Acheter ce numéro {{ formatPrice(news.price || 2000) }} FCFA
+                                    {{ $t('alt_news.purchase.buy_edition') }} {{ formatPrice(news.price || 2000) }} FCFA
                                 </button>
                             </div>
                         </div>
@@ -459,11 +459,11 @@ const handlePaymentSuccess = () => {
                 <div v-if="filteredNews.length === 0 && altNews.length > 0" class="col-12 text-center py-5">
                     <div class="empty-state">
                         <i class="fa-solid fa-search fs-1 text-muted mb-3"></i>
-                        <h4 class="text-muted">Aucune édition trouvée</h4>
-                        <p class="text-muted mb-4">Essayez de modifier vos critères de recherche ou de filtre.</p>
+                        <h4 class="text-muted">{{ $t('alt_news.filters.no_edition_found') }}</h4>
+                        <p class="text-muted mb-4">{{ $t('alt_news.filters.modify_criteria') }}</p>
                         <button @click="activeFilter = 'all'; searchQuery = ''" class="btn-reset-filters">
                             <i class="fa-solid fa-rotate-left me-2"></i>
-                            Réinitialiser les filtres
+                            {{ $t('alt_news.filters.reset_filters') }}
                         </button>
                     </div>
                 </div>
@@ -481,7 +481,7 @@ const handlePaymentSuccess = () => {
                 <div v-if="filteredNews.length > itemsPerPage && totalPages > 1" class="col-12">
                     <div class="pagination-container">
                         <div class="pagination-info">
-                            Affichage de {{ (currentPage - 1) * itemsPerPage + 1 }} à {{ Math.min(currentPage * itemsPerPage, filteredNews.length) }} sur {{ filteredNews.length }} éditions
+                            {{ $t('alt_news.filters.showing') }} {{ (currentPage - 1) * itemsPerPage + 1 }} {{ $t('alt_news.filters.to') }} {{ Math.min(currentPage * itemsPerPage, filteredNews.length) }} {{ $t('alt_news.filters.of') }} {{ filteredNews.length }} {{ $t('alt_news.filters.editions') }}
                         </div>
                         <div class="pagination-controls">
                             <button

@@ -9,6 +9,8 @@ interface AltData {
     title: string;
     date: string;
     image: string;
+    is_free?: boolean;
+    price?: number;
 }
 
 interface EventItem {
@@ -64,6 +66,12 @@ const shouldLoop = computed(() => {
 const getDisplayItems = (items: any[], isMobile: boolean) => {
     return isMobile ? items.slice(0, 1) : items;
 };
+
+// Formater le prix
+const formatPrice = (price: number | undefined) => {
+    if (!price) return '2000';
+    return new Intl.NumberFormat('fr-FR').format(price);
+};
 </script>
 
 <template>
@@ -96,10 +104,31 @@ const getDisplayItems = (items: any[], isMobile: boolean) => {
                                                     :class="{ 'd-none d-md-block': index > 0 }">
                                                     <div class="tp-service-2-wrap p-relative fix mb-30 wow fadeInLeft"
                                                         data-wow-duration=".9s">
-                                                        <div class="tp-service-2-thumb tp-round-4">
+                                                        <div class="tp-service-2-thumb tp-round-4 position-relative">
                                                             <img class="w-100 tp-round-4"
                                                                 :src="`${config.public.apiBaseUrl}/storage/${item.image}`"
                                                                 :alt="item.title">
+                                                            <!-- Badge Premium/Gratuit -->
+                                                            <div class="edition-type-badge-home">
+                                                                <span v-if="item.is_free" class="badge-free-home">
+                                                                    <i class="fa-solid fa-gift me-1"></i> Gratuit
+                                                                </span>
+                                                                <span v-else class="badge-premium-home">
+                                                                    <i class="fa-solid fa-crown me-1"></i> Premium
+                                                                </span>
+                                                            </div>
+                                                            <!-- Prix pour éditions premium -->
+                                                            <div v-if="!item.is_free" class="edition-price-tag-home">
+                                                                {{ formatPrice(item.price) }} FCFA
+                                                            </div>
+                                                            <!-- Bande verte en bas pour acheter -->
+                                                            <div v-if="!item.is_free" class="purchase-banner-home">
+                                                                <NuxtLink :to="localePath({ name: 'alt-news-id', params: { id: item.id } })"
+                                                                    class="purchase-link-home">
+                                                                    <i class="fa-solid fa-shopping-cart me-2"></i>
+                                                                    Acheter ce numéro - {{ formatPrice(item.price) }} FCFA
+                                                                </NuxtLink>
+                                                            </div>
                                                         </div>
                                                         <div class="tp-service-2-content p-absolute">
                                                             <div
@@ -326,6 +355,88 @@ const getDisplayItems = (items: any[], isMobile: boolean) => {
     object-fit: fill !important;
     width: 100% !important;
     height: 100% !important;
+}
+
+/* Badge Premium/Gratuit pour la page d'accueil */
+.edition-type-badge-home {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    z-index: 10;
+}
+
+.badge-free-home {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #9E73B0, #7B1FA2);
+    color: white;
+    box-shadow: 0 4px 15px rgba(158, 115, 176, 0.4);
+}
+
+.badge-premium-home {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #d4b128, #b8991d);
+    color: white;
+    box-shadow: 0 4px 15px rgba(212, 177, 40, 0.4);
+}
+
+/* Prix pour éditions premium sur la page d'accueil */
+.edition-price-tag-home {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    backdrop-filter: blur(5px);
+    z-index: 10;
+}
+
+/* Bande verte en bas pour acheter */
+.purchase-banner-home {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #10b981, #059669);
+    padding: 0;
+    border-radius: 0 0 12px 12px;
+    z-index: 10;
+    overflow: hidden;
+}
+
+.purchase-link-home {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-family: var(--cs-family-montserrat);
+}
+
+.purchase-link-home:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.purchase-link-home i {
+    font-size: 1.1rem;
 }
 
 /* Styles supplémentaires pour améliorer l'affichage mobile */
