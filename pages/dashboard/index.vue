@@ -516,7 +516,7 @@ useHead({
                         </li>
                         <li class="nav-item">
                             <button class="nav-link" :class="{ active: activeTab === 'free' }" @click="activeTab = 'free'">
-                                <i class="fa-solid fa-gift me-1"></i>Gratuites
+                                <i class="fa-solid fa-gift me-1"></i>Gratuit
                             </button>
                         </li>
                         <li class="nav-item">
@@ -626,7 +626,7 @@ useHead({
                     <!-- Free Editions -->
                     <div v-if="activeTab === 'free'" class="card shadow-sm">
                         <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0"><i class="fa-solid fa-gift me-2"></i>Éditions Gratuites</h5>
+                            <h5 class="mb-0"><i class="fa-solid fa-gift me-2"></i>Éditions Gratuit</h5>
                             <span class="badge bg-success">{{ freeEditions.length }} gratuites</span>
                         </div>
                         <div class="card-body p-0">

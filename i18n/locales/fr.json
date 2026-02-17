@@ -199,7 +199,7 @@
         },
         "filters": {
             "all": "Toutes",
-            "free": "Gratuites",
+            "free": "Gratuit",
             "premium": "Premium",
             "search_placeholder": "Rechercher une édition...",
             "results": "édition(s) trouvée(s)",

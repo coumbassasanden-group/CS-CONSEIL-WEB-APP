@@ -214,10 +214,10 @@
             :favorites-count="favoritesCount"
           />
 
-          <!-- Editions Gratuites -->
+          <!-- Editions Gratuit -->
           <SubscriberEditionsGrid
             v-if="activeTab === 'free'"
-            title="Éditions Gratuites"
+            title="Éditions Gratuit"
             subtitle="Découvrez les aperçus et éditions gratuites de ALT News"
             header-icon="mdi:gift"
             :editions="freeEditions"
@@ -631,7 +631,7 @@ const isExpirationSoon = computed(() => {
 const availableTabs = computed(() => {
   return [
     { id: 'profile', label: 'Mon Profil', icon: 'mdi:account', count: 0 },
-    { id: 'free', label: 'Éditions Gratuites', icon: 'mdi:gift', count: freeEditions.value.length },
+    { id: 'free', label: 'Éditions Gratuit', icon: 'mdi:gift', count: freeEditions.value.length },
     { id: 'premium', label: 'Éditions Premium', icon: 'mdi:crown', count: canAccessPremium.value ? premiumEditions.value.length : 0 },
     { id: 'myeditions', label: 'Mes Éditions', icon: 'mdi:bookmark-check', count: myPurchasedEditions.value.length },
     { id: 'payments', label: 'Historique Paiements', icon: 'mdi:receipt-text', count: paymentHistory.value.length }
@@ -831,7 +831,7 @@ const downloadEdition = async (edition: any, forceFreePdf: boolean = false) => {
 
   try {
     // Déterminer si on doit télécharger la version gratuite ou premium
-    // forceFreePdf = true quand on est dans l'onglet "Éditions Gratuites"
+    // forceFreePdf = true quand on est dans l'onglet "Éditions Gratuit"
     // Sinon, si l'utilisateur a un accès premium, télécharger la version premium
     const shouldDownloadFree = forceFreePdf || (!canAccessPremium.value && !isEditionPurchased(edition.id))
 
