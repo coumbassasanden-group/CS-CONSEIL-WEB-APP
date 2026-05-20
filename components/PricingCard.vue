@@ -15,10 +15,11 @@
     <!-- En-tête -->
     <div class="pricing-header">
       <div class="plan-icon">{{ plan.icon }}</div>
-      <h3 v-if="plan.price === 0" class="plan-name">Gratuit</h3>
-      <h3 v-else class="plan-name">{{ plan.name }}</h3>
+      <h3 class="plan-name">{{ plan.name }}</h3>
       <div class="plan-price">
-        <span v-if="plan.price === 0" class="free-text limited-text">Limité</span>
+        <span v-if="plan.price === 0" class="free-text" :class="{ 'limited-text': plan.type === 'free' }">
+          {{ plan.type === 'free' ? 'Limité' : 'Gratuit' }}
+        </span>
         <template v-else>
           <span class="amount">{{ formatPrice(plan.price) }}</span>
           <span class="currency">FCFA</span>
@@ -56,6 +57,7 @@
 <script setup lang="ts">
 interface Plan {
   id: string
+  type?: string
   name: string
   price: number
   currency?: string

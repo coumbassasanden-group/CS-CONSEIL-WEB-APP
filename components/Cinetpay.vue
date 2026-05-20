@@ -83,14 +83,9 @@ const checkout = async (handlePost?: Function) => {
   console.log('🔄 Tentative d\'ouverture du paiement Cinetpay...')
 
   // Vérifier que Cinetpay est chargé
-  if (!isCinetPayLoaded.value) {
-    console.error('❌ CinetPay n\'est pas chargé. Attente...')
-    return
-  }
-
-  // Vérifier que window.CinetPay existe
-  if (typeof window.CinetPay === 'undefined') {
-    console.error('❌ window.CinetPay est undefined')
+  if (!isCinetPayLoaded.value || typeof window.CinetPay === 'undefined') {
+    console.error('❌ CinetPay n\'est pas chargé')
+    alert('Le module de paiement n\'a pas pu être chargé. Veuillez rafraîchir la page et réessayer.')
     return
   }
 
@@ -100,6 +95,7 @@ const checkout = async (handlePost?: Function) => {
       amount: props.amount,
       email: props.email
     })
+    alert('Données de paiement incomplètes. Veuillez vérifier votre sélection de plan.')
     return
   }
 
@@ -137,7 +133,7 @@ const checkout = async (handlePost?: Function) => {
     })
 
     // Attendre la réponse du paiement AVANT getCheckout
-    window.CinetPay.waitResponse(function (data: any) {
+    window.CinetPay.waitResponse(async function (data: any) {
       console.log('📊 Réponse Cinetpay reçue:', data)
 
       if (data.status === 'REFUSED') {
@@ -151,14 +147,11 @@ const checkout = async (handlePost?: Function) => {
         if (handlePost && typeof handlePost === 'function') {
           console.log('📤 Appel du callback handlePost...')
           try {
-            handlePost()
+            await handlePost()
           } catch (callbackError) {
             console.error('❌ Erreur dans le callback:', callbackError)
           }
         }
-
-        alert('Votre paiement a été effectué avec succès')
-        setTimeout(() => window.location.reload(), 1000)
       } else if (data.status === 'PENDING') {
         console.log('⏳ Paiement en attente...')
         alert('Votre paiement est en attente de confirmation')

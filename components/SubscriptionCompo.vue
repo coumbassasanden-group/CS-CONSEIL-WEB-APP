@@ -385,9 +385,9 @@ useHead({
 /* Pricing Grid */
 .pricing-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 2rem;
-  max-width: 1200px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -662,6 +662,12 @@ useHead({
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+  .pricing-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .hero-title {
     font-size: 2.5rem;
@@ -683,7 +689,10 @@ useHead({
     font-size: 2rem;
   }
 
-  .pricing-grid,
+  .pricing-grid {
+    grid-template-columns: 1fr;
+  }
+
   .testimonials-grid {
     grid-template-columns: 1fr;
   }

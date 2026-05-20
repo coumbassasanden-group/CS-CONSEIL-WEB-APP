@@ -264,8 +264,13 @@ export const useSubscription = () => {
    * Normaliser un plan pour l'utilisation dans l'application
    */
   const normalizePlan = (plan: any) => {
+    // Surcharge du libellé pour le plan étudiant IUA
+    const isStudentIua = plan?.id === 'student_iua' || plan?.type === 'student_iua'
+    const displayName = isStudentIua ? 'Étudiant IUA / AUPROHADA-UCAO' : plan?.name
+
     return {
       ...plan,
+      name: displayName,
       price: parseFloat(String(plan.price)) || 0,
       features: parseFeatures(plan.features),
       duration: parseInt(String(plan.duration)) || 30
@@ -365,7 +370,7 @@ export const useSubscription = () => {
       const formData = new FormData()
 
       // Récupérer le token d'authentification
-      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+      const token = typeof window !== 'undefined' ? (localStorage.getItem('authToken') || localStorage.getItem('auth_token')) : null
 
       // ✅ Utiliser le transactionId passé en paramètre ou depuis subscriptionData
       const txId = subscriptionData?.transactionId || subscriptionForm.value.transactionId || ''
@@ -413,22 +418,21 @@ export const useSubscription = () => {
       // ✅ Sinon, nouvel utilisateur - utiliser l'endpoint subscribe
       console.log('📤 Nouvel utilisateur - utilisation de subscribe')
 
-      // Ajouter les données du formulaire
-      if (subscriptionForm.value.userId) {
-        formData.append('userId', subscriptionForm.value.userId)
-      }
+      // Ajouter les données du formulaire (noms de champs compatibles avec le backend Laravel)
       formData.append('email', subscriptionForm.value.email)
-      formData.append('firstName', subscriptionForm.value.firstName)
-      formData.append('lastName', subscriptionForm.value.lastName)
-      formData.append('company', subscriptionForm.value.company || '')
+      formData.append('first_name', subscriptionForm.value.firstName)
+      formData.append('last_name', subscriptionForm.value.lastName)
       formData.append('phone', subscriptionForm.value.phone || '')
-      formData.append('planId', String(subscriptionForm.value.planId))
-      formData.append('newsletter', String(subscriptionForm.value.newsletter))
-      formData.append('transactionId', txId)
+      formData.append('type', String(subscriptionForm.value.planId))
+
+      // Ajouter le mot de passe si disponible (requis pour /subscribe)
+      if (subscriptionData?.password) {
+        formData.append('password', subscriptionData.password)
+      }
 
       // Ajouter le justificatif étudiant si applicable
       if (subscriptionForm.value.studentProof) {
-        formData.append('studentProof', subscriptionForm.value.studentProof)
+        formData.append('student_proof', subscriptionForm.value.studentProof)
       }
 
       // Construire les headers avec authentification si disponible

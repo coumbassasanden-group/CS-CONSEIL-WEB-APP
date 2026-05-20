@@ -51,7 +51,13 @@ const fetchPlans = async () => {
     try {
         const response = await fetch(`${config.public.apiBaseUrl}/subscription/plans`);
         const data = await response.json();
-        plans.value = data.plans;
+        // Surcharge du libellé pour le plan étudiant IUA
+        plans.value = (data.plans || []).map((plan) => {
+            if (plan?.id === 'student_iua' || plan?.type === 'student_iua') {
+                return { ...plan, name: 'Étudiant IUA / AUPROHADA-UCAO' };
+            }
+            return plan;
+        });
     } catch (err) {
         console.error('Error fetching plans:', err);
     } finally {
@@ -122,7 +128,7 @@ const submitSubscription = async () => {
             formData.append('password', form.value.password);
             formData.append('type', selectedPlan.value.type);
 
-            if (selectedPlan.value.type === 'student' && form.value.student_proof) {
+            if ((selectedPlan.value.type === 'student' || selectedPlan.value.type === 'student_iua') && form.value.student_proof) {
                 formData.append('student_proof', form.value.student_proof);
             }
         }
@@ -141,8 +147,12 @@ const submitSubscription = async () => {
             throw new Error(data.message || 'Une erreur est survenue');
         }
 
+        // student_iua est gratuit → pas de paiement, montrer le succès directement
+        if (selectedPlan.value.type === 'student_iua') {
+            success.value = true;
+        }
         // Si c'est un abonnement payant, afficher l'interface de paiement
-        if (selectedPlan.value.type !== 'free' && data.subscription_id) {
+        else if (selectedPlan.value.type !== 'free' && data.subscription_id) {
             subscriptionId.value = data.subscription_id;
             transactionId.value = generateTransactionId();
             showPayment.value = true;
@@ -377,19 +387,24 @@ onMounted(() => {
                     <!-- Modal Body -->
                     <div class="modal-body">
                         <!-- Success Message -->
-                        <div v-if="success && !showPayment" class="alert alert-success text-center">
-                            <i class="fa-solid fa-check-circle fa-3x mb-3"></i>
-                            <h5>{{ selectedPlan?.type === 'free' ? 'Inscription réussie !' : 'Paiement confirmé !' }}</h5>
+                        <div v-if="success && !showPayment" class="alert text-center" :class="(selectedPlan?.type === 'student' || selectedPlan?.type === 'student_iua') ? 'alert-warning' : 'alert-success'">
+                            <i :class="['fa-solid', (selectedPlan?.type === 'student' || selectedPlan?.type === 'student_iua') ? 'fa-clock fa-3x mb-3' : 'fa-check-circle fa-3x mb-3']"></i>
+                            <h5 v-if="selectedPlan?.type === 'free'">Inscription réussie !</h5>
+                            <h5 v-else-if="selectedPlan?.type === 'student' || selectedPlan?.type === 'student_iua'">Inscription enregistrée !</h5>
+                            <h5 v-else>Paiement confirmé !</h5>
                             <p v-if="selectedPlan?.type === 'free'">
                                 Vous êtes maintenant inscrit à notre newsletter ALT News.
                             </p>
-                            <p v-else-if="selectedPlan?.type === 'student'">
-                                Votre demande d'abonnement étudiant est en attente de validation.
+                            <p v-else-if="selectedPlan?.type === 'student' || selectedPlan?.type === 'student_iua'">
+                                Votre inscription est en cours de validation. Votre carte étudiante est en cours de vérification par notre équipe. Vous recevrez un email de confirmation dès que votre abonnement sera activé.
                             </p>
                             <p v-else>
                                 Votre abonnement a été activé avec succès !
                             </p>
-                            <button v-if="selectedPlan?.type !== 'free'" class="btn btn-primary mt-3" @click="goToSubscriberSpace">
+                            <button v-if="selectedPlan?.type === 'student' || selectedPlan?.type === 'student_iua'" class="btn btn-secondary mt-3" @click="closeModal">
+                                Compris, merci !
+                            </button>
+                            <button v-else-if="selectedPlan?.type !== 'free'" class="btn btn-primary mt-3" @click="goToSubscriberSpace">
                                 Accéder à mon espace abonné
                             </button>
                             <button v-else class="btn btn-secondary mt-3" @click="closeModal">Fermer</button>
@@ -485,17 +500,24 @@ onMounted(() => {
                                 <small class="text-muted">Minimum 6 caractères</small>
                             </div>
 
-                            <!-- Student Proof (for student plan) -->
-                            <div v-if="selectedPlan?.type === 'student'" class="mb-3">
-                                <label class="form-label">Justificatif étudiant *</label>
-                                <input 
-                                    type="file" 
-                                    class="form-control" 
+                            <!-- Student Proof (for student and student_iua plans) -->
+                            <div v-if="selectedPlan?.type === 'student' || selectedPlan?.type === 'student_iua'" class="mb-3">
+                                <label class="form-label">
+                                    {{ selectedPlan?.type === 'student_iua' ? 'Carte étudiante IUA *' : 'Justificatif étudiant *' }}
+                                </label>
+                                <input
+                                    type="file"
+                                    class="form-control"
                                     @change="handleFileUpload"
                                     accept=".pdf,.jpg,.jpeg,.png"
                                     required
                                 >
-                                <small class="text-muted">Carte étudiante ou certificat de scolarité (PDF, JPG, PNG)</small>
+                                <small class="text-muted">
+                                    {{ selectedPlan?.type === 'student_iua'
+                                        ? 'Votre carte étudiante IUA de l\'année en cours (PDF, JPG, PNG)'
+                                        : 'Carte étudiante ou certificat de scolarité (PDF, JPG, PNG)'
+                                    }}
+                                </small>
                             </div>
 
                             <!-- Submit Button -->
@@ -510,7 +532,7 @@ onMounted(() => {
                                     Traitement...
                                 </span>
                                 <span v-else>
-                                    {{ selectedPlan?.type === 'free' ? 'S\'inscrire gratuitement' : 'Continuer vers le paiement' }}
+                                    {{ selectedPlan?.type === 'free' ? 'S\'inscrire gratuitement' : (selectedPlan?.type === 'student_iua' ? 'Finaliser mon inscription' : 'Continuer vers le paiement') }}
                                 </span>
                             </button>
                         </form>

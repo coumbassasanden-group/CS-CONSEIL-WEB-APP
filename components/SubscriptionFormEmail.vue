@@ -351,7 +351,7 @@
       <div v-if="isStudentPlan" class="student-proof-section">
         <div class="selection-header">
           <h3><Icon icon="mdi:school" width="24" height="24" /> Justificatif étudiant</h3>
-          <p class="selection-subtitle">Prière d'uploader la carte d'étudiant de l'année en cours ou tout autre document justificatif</p>
+          <p class="selection-subtitle">Prière d'uploader votre carte d'étudiant IUA de l'année en cours ou tout autre justificatif de scolarité</p>
           <span class="required-badge">Obligatoire</span>
         </div>
 
@@ -392,7 +392,29 @@
 
     <!-- ========== ÉTAPE 5: CONFIRMATION ========== -->
     <section v-if="currentStep === 'confirmation'" class="step confirmation-step">
-      <div class="success-box">
+      <!-- Message pour plans étudiants (en attente de validation) -->
+      <div v-if="isStudentPlan" class="pending-validation-box">
+        <div class="pending-icon">
+          <Icon icon="mdi:clock-check-outline" width="64" height="64" />
+        </div>
+        <h2>Inscription enregistrée !</h2>
+        <p class="pending-message">
+          Votre demande d'abonnement <strong>{{ (selectedPlanDetails || getSelectedPlan)?.name }}</strong> a bien été prise en compte.
+        </p>
+        <div class="validation-info-card">
+          <div class="validation-info-icon">
+            <Icon icon="mdi:information-outline" width="24" height="24" />
+          </div>
+          <div class="validation-info-content">
+            <h4>Inscription en cours de validation</h4>
+            <p>Votre carte étudiante est en cours de vérification par notre équipe. Vous recevrez un email de confirmation dès que votre abonnement sera activé.</p>
+            <p class="validation-delay">Délai de traitement : <strong>24 à 48 heures ouvrées</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Message pour plans classiques (actifs immédiatement) -->
+      <div v-else class="success-box">
         <div class="success-icon">✓</div>
         <h2>Abonnement créé avec succès!</h2>
         <p>Votre abonnement est maintenant actif</p>
@@ -411,7 +433,12 @@
 
         <div class="detail-item">
           <label>Plan</label>
-          <p>{{ getSelectedPlan?.name }}</p>
+          <p>{{ (selectedPlanDetails || getSelectedPlan)?.name }}</p>
+        </div>
+
+        <div v-if="isStudentPlan" class="detail-item">
+          <label>Statut</label>
+          <p class="status-pending">En attente de validation</p>
         </div>
       </div>
 
@@ -420,11 +447,9 @@
       </p>
 
       <button @click="handleFinish" class="btn btn-primary btn-lg">
-        Accéder à mon compte →
+        {{ isStudentPlan ? 'Retour à l\'accueil' : 'Accéder à mon compte →' }}
       </button>
 
-      <!-- Composant Cinetpay pour le paiement -->
-     
     </section>
   </div>
   
@@ -479,9 +504,16 @@ const handleStudentProofUpload = (event: Event) => {
 }
 
 const isStudentPlan = computed(() => {
-  return selectedPlanDetails.value?.id === studentPlan.value ||
-         selectedPlanDetails.value?.type === 'student' ||
-         getSelectedPlan.value?.type === 'student'
+  const plan = selectedPlanDetails.value || getSelectedPlan.value
+  if (!plan) return false
+  return plan.id === studentPlan.value ||
+         plan.type === 'student' ||
+         plan.type === 'student_iua' ||
+         plan.id === 'student_iua' ||
+         plan.requiresProof === true ||
+         (plan.name && plan.name.toLowerCase().includes('étudiant')) ||
+         (plan.name && plan.name.toLowerCase().includes('etudiant')) ||
+         (plan.name && plan.name.toLowerCase().includes('student'))
 })
 
 const transactionId = `TXN_altnews_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -850,7 +882,7 @@ const completeSubscription = async () => {
     transactionId: transactionId
   })
 
-  const subscriptionData = {...subscriptionForm.value, transactionId}
+  const subscriptionData = {...subscriptionForm.value, transactionId, password: password.value}
 
   console.log('📝 Appel createSubscription avec:', subscriptionData)
   const success = await createSubscription(subscriptionData)
@@ -859,6 +891,13 @@ const completeSubscription = async () => {
     console.log('✅ Abonnement créé/mis à jour avec succès!')
     // Nettoyer le localStorage pour forcer un rafraîchissement des données
     localStorage.removeItem('selectedPlan')
+
+    // Pour les plans étudiants (en attente de validation), montrer le message de confirmation
+    const plan = selectedPlanDetails.value || getSelectedPlan.value
+    if (plan && (plan.type === 'student' || plan.type === 'student_iua' || plan.id === 'student' || plan.id === 'student_iua')) {
+      currentStep.value = 'confirmation'
+      return
+    }
 
     // Récupérer la locale courante
     const pathParts = window.location.pathname.split('/')
@@ -879,7 +918,9 @@ const completeSubscription = async () => {
  */
 const handleCreateSubscription = async () => {
 
- if(subscriptionForm.value.planId === freePlan.value){
+  // Plans gratuits (free ou prix=0 comme student_iua) → pas de paiement CinetPay
+  const planPrice = selectedPlanDetails.value?.price ?? getSelectedPlan.value?.price ?? 0
+  if (subscriptionForm.value.planId === freePlan.value || planPrice === 0) {
     return completeSubscription()
   }
 
@@ -914,6 +955,14 @@ const handleFinish = () => {
   // Récupérer la locale courante
   const pathParts = window.location.pathname.split('/')
   const locale = ['fr', 'en'].includes(pathParts[1]) ? pathParts[1] : 'fr'
+
+  // Pour les plans étudiants en attente de validation, retourner à l'accueil
+  const plan = selectedPlanDetails.value || getSelectedPlan.value
+  if (plan && (plan.type === 'student' || plan.type === 'student_iua' || plan.id === 'student' || plan.id === 'student_iua')) {
+    router.push(`/${locale}/alt-news`)
+    return
+  }
+
   // Redirection vers l'espace abonné
   router.push(`/${locale}/subscriber/manage`)
 }
@@ -1624,6 +1673,77 @@ const handleFinish = () => {
 }
 
 /* ========== CONFIRMATION ========== */
+.pending-validation-box {
+  background: linear-gradient(135deg, #fef9e7 0%, #fef3c7 100%);
+  border: 2px solid #fbbf24;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.pending-icon {
+  color: #d97706;
+  margin-bottom: 0.75rem;
+}
+
+.pending-validation-box h2 {
+  color: #92400e;
+  margin: 0.75rem 0;
+  font-size: 1.5rem;
+}
+
+.pending-message {
+  color: #78350f;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+
+.validation-info-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: white;
+  border-radius: 10px;
+  padding: 1.25rem;
+  text-align: left;
+  border: 1px solid #fde68a;
+}
+
+.validation-info-icon {
+  color: #d97706;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.validation-info-content h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #92400e;
+  margin: 0 0 0.5rem 0;
+}
+
+.validation-info-content p {
+  font-size: 0.9rem;
+  color: #78350f;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.5;
+}
+
+.validation-delay {
+  font-size: 0.85rem !important;
+  color: #b45309 !important;
+}
+
+.status-pending {
+  color: #d97706 !important;
+  background: #fef3c7;
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem !important;
+}
+
 .success-box {
   background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
   border: 2px solid #86efac;
