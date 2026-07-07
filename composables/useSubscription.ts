@@ -264,15 +264,27 @@ export const useSubscription = () => {
    * Normaliser un plan pour l'utilisation dans l'application
    */
   const normalizePlan = (plan: any) => {
-    // Surcharge du libellé pour le plan étudiant IUA
+    // Surcharge du libellé et des features pour le plan étudiant IUA / AUPROHADA-UCAO
     const isStudentIua = plan?.id === 'student_iua' || plan?.type === 'student_iua'
-    const displayName = isStudentIua ? 'Étudiant IUA / AUPROHADA-UCAO' : plan?.name
+    const displayName = isStudentIua ? 'Étudiants IUA / AUPROHADA-UCAO' : plan?.name
+
+    let features = parseFeatures(plan.features)
+    if (isStudentIua) {
+      const cardFeature = 'Carte étudiants IUA / Carte de membre AUPROHADA-UCAO'
+      features = features.map((f) =>
+        String(f).toLowerCase().includes('carte') ? cardFeature : f
+      )
+      if (!features.some((f) => String(f).includes('AUPROHADA'))) {
+        features.push(cardFeature)
+      }
+    }
 
     return {
       ...plan,
       name: displayName,
+      icon: isStudentIua ? (plan.icon || '🎓') : plan.icon,
       price: parseFloat(String(plan.price)) || 0,
-      features: parseFeatures(plan.features),
+      features,
       duration: parseInt(String(plan.duration)) || 30
     }
   }

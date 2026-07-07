@@ -351,7 +351,7 @@
       <div v-if="isStudentPlan" class="student-proof-section">
         <div class="selection-header">
           <h3><Icon icon="mdi:school" width="24" height="24" /> Justificatif étudiant</h3>
-          <p class="selection-subtitle">Prière d'uploader votre carte d'étudiant IUA de l'année en cours ou tout autre justificatif de scolarité</p>
+          <p class="selection-subtitle">Prière d'uploader votre carte d'étudiant IUA, votre carte de membre AUPROHADA-UCAO de l'année en cours, ou tout autre justificatif de scolarité</p>
           <span class="required-badge">Obligatoire</span>
         </div>
 
