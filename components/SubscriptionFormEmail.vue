@@ -381,10 +381,11 @@
       <div class="button-group mt-4">
         <button
           @click="handleCreateSubscription"
-          :disabled="isProcessing || (isStudentPlan && !studentProofFile)"
+          :disabled="isProcessing || isPaying || (isStudentPlan && !studentProofFile)"
           class="btn btn-primary btn-lg"
         >
           <span v-if="isProcessing">Création de l'abonnement...</span>
+          <span v-else-if="isPaying">Redirection vers le paiement...</span>
           <span v-else>Finaliser mon abonnement</span>
         </button>
       </div>
@@ -473,11 +474,22 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSubscription } from '~/composables/useSubscription'
 import { useAuth } from '~/composables/useAuth'
+import {
+  JEKO_CHECKOUT_DETAILS_KEY,
+  JEKO_CHECKOUT_REFERENCE_KEY,
+  JEKO_PENDING_SUBSCRIPTION_KEY,
+  useJekoCheckout
+} from '~/composables/useJekoCheckout'
 import Cinetpay from '~/components/Cinetpay.vue'
 import {Icon} from "@iconify/vue"
 
 const router = useRouter()
+const config = useRuntimeConfig()
 const { isLoggedIn, getAuthUser } = useAuth()
+const {
+  createCheckout: createJekoCheckout,
+  error: jekoCheckoutError
+} = useJekoCheckout()
 const cinetpayRef = ref<InstanceType<typeof Cinetpay> | null>(null)
 const isPaying = ref(false)
 
@@ -564,6 +576,22 @@ const shouldShowRecap = computed(() => {
     userId: subscriptionForm.value.userId
   })
   return result
+})
+
+const selectedPlanPrice = computed(() => {
+  return Number(selectedPlanDetails.value?.price ?? getSelectedPlan.value?.price ?? 0)
+})
+
+const jekoBusiness = computed(() => {
+  return String(config.public.CS_JEKO_BUSINESS || '')
+})
+
+const jekoPaymentMethod = computed(() => {
+  return String(config.public.CS_JEKO_PAYMENT_METHOD || 'wave')
+})
+
+const isPaidJekoPlan = computed(() => {
+  return shouldShowRecap.value && subscriptionForm.value.planId !== freePlan.value && selectedPlanPrice.value > 0
 })
 
 // Vérification email en temps réel
@@ -914,38 +942,105 @@ const completeSubscription = async () => {
 }
 
 /**
- * Étape 4: Déclencher le paiement Cinetpay
+ * Étape 4: Déclencher le paiement Jeko
  */
-const handleCreateSubscription = async () => {
+const getSerializableSubscriptionData = () => {
+  const {
+    studentProof,
+    ...serializableSubscriptionForm
+  } = subscriptionForm.value
 
-  // Plans gratuits (free ou prix=0 comme student_iua) → pas de paiement CinetPay
-  const planPrice = selectedPlanDetails.value?.price ?? getSelectedPlan.value?.price ?? 0
-  if (subscriptionForm.value.planId === freePlan.value || planPrice === 0) {
-    return completeSubscription()
+  return {
+    ...serializableSubscriptionForm,
+    transactionId,
+    password: password.value
   }
+}
 
-  // return completeSubscription()
-  console.log('🔘 Bouton de paiement cliqué...') 
-  
-  // Vérifier que le composant Cinetpay est prêt
-  if (!cinetpayRef.value) {
-    console.error('❌ Composant Cinetpay non initialisé')
-    alert('Erreur: Composant de paiement non prêt')
-    return
-  }
-  
-  // Vérifier que les données sont valides
-  if (!subscriptionForm.value.email || !subscriptionForm.value.phone) {
+const getCurrentLocale = () => {
+  const pathParts = window.location.pathname.split('/')
+  return ['fr', 'en'].includes(pathParts[1]) ? pathParts[1] : 'fr'
+}
+
+const normalizeJekoUserId = (userId: string | null) => {
+  if (!userId) return subscriptionForm.value.email
+  const numericUserId = Number(userId)
+  return Number.isFinite(numericUserId) && String(numericUserId) === String(userId)
+    ? numericUserId
+    : userId
+}
+
+const payWithJeko = async (amount: number) => {
+  if (!subscriptionForm.value.userId || !subscriptionForm.value.email || !subscriptionForm.value.phone) {
     console.error('❌ Données d\'abonnement incomplètes')
     alert('Veuillez remplir tous les champs requis')
     return
   }
-  
+
+  if (!jekoBusiness.value) {
+    errorMessage.value = 'Configuration Jeko incomplète: CS_JEKO_BUSINESS est manquant'
+    return
+  }
+
+  const paymentWindow = window.open('about:blank', '_blank')
+
   isPaying.value = true
-  console.log('💳 Déclenchement du paiement Cinetpay...')
-  
-  // ✨ APPEL DIRECT À checkout() avec callback
-   cinetpayRef.value?.checkout(completeSubscription)
+  errorMessage.value = ''
+
+  try {
+    const locale = getCurrentLocale()
+    const returnUrl = `${window.location.origin}/${locale}/payment/success`
+    const selectedPlan = selectedPlanDetails.value || getSelectedPlan.value
+    const pendingSubscription = getSerializableSubscriptionData()
+
+    const checkout = await createJekoCheckout({
+      userId: normalizeJekoUserId(subscriptionForm.value.userId),
+      business: jekoBusiness.value,
+      amount,
+      currency: 'XOF',
+      paymentMethod: jekoPaymentMethod.value,
+      metadata: {
+        source: 'nuxt',
+        planId: subscriptionForm.value.planId,
+        email: subscriptionForm.value.email,
+        phone: subscriptionForm.value.phone,
+        transactionId,
+        frontendReturnUrl: `${returnUrl}?reference={reference}`
+      }
+    })
+
+    localStorage.setItem(JEKO_CHECKOUT_REFERENCE_KEY, checkout.reference)
+    localStorage.setItem(JEKO_CHECKOUT_DETAILS_KEY, JSON.stringify(checkout))
+    localStorage.setItem(JEKO_PENDING_SUBSCRIPTION_KEY, JSON.stringify(pendingSubscription))
+
+    console.log('✅ Checkout Jeko créé:', {
+      reference: checkout.reference,
+      paymentRequestId: checkout.paymentRequestId,
+      plan: selectedPlan?.name
+    })
+
+    if (paymentWindow) {
+      paymentWindow.location.href = checkout.redirectUrl
+    } else {
+      await navigateTo(checkout.redirectUrl, { external: true })
+    }
+  } catch (error: any) {
+    paymentWindow?.close()
+    console.error('❌ Erreur checkout Jeko:', error)
+    errorMessage.value = jekoCheckoutError.value || error?.message || 'Erreur lors de la création du paiement'
+    isPaying.value = false
+  }
+}
+
+const handleCreateSubscription = async () => {
+  // Plans gratuits (free ou prix=0 comme student_iua) → pas de paiement Jeko
+  const planPrice = selectedPlanPrice.value
+  if (subscriptionForm.value.planId === freePlan.value || planPrice === 0) {
+    return completeSubscription()
+  }
+
+  console.log('💳 Déclenchement du paiement Jeko...')
+  await payWithJeko(planPrice)
 }
 
 /**
@@ -1306,6 +1401,84 @@ const handleFinish = () => {
 
 .file-name {
   color: #10b981 !important;
+}
+
+/* Section moyens de paiement */
+.payment-methods-section {
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 2rem;
+  margin: 2rem 0;
+}
+
+.payment-methods-loading {
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.payment-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.875rem;
+}
+
+.payment-method-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 72px;
+  padding: 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.payment-method-card:hover {
+  border-color: #d4b128;
+  background: #fffdf5;
+}
+
+.payment-method-card.selected {
+  border-color: #d4b128;
+  background: #fff8dc;
+  box-shadow: 0 4px 14px rgba(212, 177, 40, 0.18);
+}
+
+.payment-method-card input {
+  width: 18px;
+  height: 18px;
+  accent-color: #d4b128;
+  flex-shrink: 0;
+}
+
+.method-logo {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #6b7280;
+  overflow: hidden;
+}
+
+.method-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.method-name {
+  color: #1f2937;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 /* ========== INFO BOX ========== */

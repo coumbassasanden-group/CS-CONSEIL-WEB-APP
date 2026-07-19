@@ -1,0 +1,309 @@
+<template>
+  <div class="payment-status-page">
+    <section class="status-panel">
+      <div class="status-icon" :class="statusClass">
+        <Icon :icon="statusIcon" width="44" height="44" />
+      </div>
+
+      <h1>{{ title }}</h1>
+      <p class="message">{{ message }}</p>
+
+      <div v-if="reference" class="reference-row">
+        <span>Référence</span>
+        <strong>{{ reference }}</strong>
+      </div>
+
+      <div v-if="apiError || finalizeError" class="alert alert-error">
+        {{ apiError || finalizeError }}
+      </div>
+
+      <div class="actions">
+        <button
+          v-if="paymentStatus === 'pending'"
+          type="button"
+          class="btn btn-primary"
+          :disabled="statusLoading"
+          @click="checkStatus"
+        >
+          <span v-if="statusLoading">Vérification...</span>
+          <span v-else>Vérifier maintenant</span>
+        </button>
+
+        <NuxtLink :to="`/${currentLocale}/subscriber/manage`" class="btn btn-secondary">
+          Espace abonné
+        </NuxtLink>
+      </div>
+    </section>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Icon } from '@iconify/vue'
+import {
+  JEKO_CHECKOUT_REFERENCE_KEY,
+  JEKO_COMPLETED_REFERENCE_KEY,
+  JEKO_PENDING_SUBSCRIPTION_KEY,
+  useJekoCheckout,
+  type JekoPaymentStatus
+} from '~/composables/useJekoCheckout'
+import { useSubscription } from '~/composables/useSubscription'
+
+const route = useRoute()
+
+const {
+  getStatus,
+  error: jekoError
+} = useJekoCheckout()
+
+const {
+  createSubscription,
+  subscriptionForm
+} = useSubscription()
+
+const reference = ref('')
+const paymentStatus = ref<JekoPaymentStatus>('pending')
+const statusLoading = ref(false)
+const finalizeLoading = ref(false)
+const finalizeError = ref('')
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+const currentLocale = computed(() => {
+  const pathParts = route.path.split('/')
+  const locale = pathParts[1]
+  return ['fr', 'en'].includes(locale) ? locale : 'fr'
+})
+
+const apiError = computed(() => jekoError.value)
+
+const statusClass = computed(() => ({
+  pending: paymentStatus.value === 'pending',
+  success: paymentStatus.value === 'success',
+  error: paymentStatus.value === 'error'
+}))
+
+const statusIcon = computed(() => {
+  if (paymentStatus.value === 'success') return 'mdi:check-circle-outline'
+  if (paymentStatus.value === 'error') return 'mdi:alert-circle-outline'
+  return 'mdi:clock-outline'
+})
+
+const title = computed(() => {
+  if (paymentStatus.value === 'success') return 'Paiement confirmé'
+  if (paymentStatus.value === 'error') return 'Paiement échoué'
+  return 'Paiement en attente'
+})
+
+const message = computed(() => {
+  if (finalizeLoading.value) return 'Paiement confirmé. Activation de votre abonnement en cours...'
+  if (paymentStatus.value === 'success') return 'Votre paiement Jeko a été validé.'
+  if (paymentStatus.value === 'error') return 'Le paiement n’a pas pu être validé. Vous pouvez réessayer depuis la page d’abonnement.'
+  return 'Nous vérifions votre paiement. Cette page se met à jour automatiquement.'
+})
+
+const stopPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+const restorePendingSubscription = () => {
+  const pending = localStorage.getItem(JEKO_PENDING_SUBSCRIPTION_KEY)
+  if (!pending) return null
+
+  try {
+    return JSON.parse(pending)
+  } catch (error) {
+    console.error('Erreur restauration abonnement Jeko:', error)
+    return null
+  }
+}
+
+const finalizeSubscription = async () => {
+  if (!reference.value || finalizeLoading.value) return
+
+  const completedReference = localStorage.getItem(JEKO_COMPLETED_REFERENCE_KEY)
+  if (completedReference === reference.value) return
+
+  const pendingSubscription = restorePendingSubscription()
+  if (!pendingSubscription) return
+
+  finalizeLoading.value = true
+  finalizeError.value = ''
+
+  try {
+    Object.assign(subscriptionForm.value, pendingSubscription)
+    const success = await createSubscription(pendingSubscription)
+
+    if (!success) {
+      throw new Error('Paiement confirmé, mais l’abonnement n’a pas pu être activé automatiquement.')
+    }
+
+    localStorage.setItem(JEKO_COMPLETED_REFERENCE_KEY, reference.value)
+    localStorage.removeItem(JEKO_PENDING_SUBSCRIPTION_KEY)
+    localStorage.removeItem(JEKO_CHECKOUT_REFERENCE_KEY)
+    localStorage.removeItem('selectedPlan')
+  } catch (error: any) {
+    finalizeError.value = error?.message || 'Erreur lors de l’activation de votre abonnement'
+  } finally {
+    finalizeLoading.value = false
+  }
+}
+
+const checkStatus = async () => {
+  if (!reference.value) {
+    finalizeError.value = 'Référence de paiement introuvable'
+    return
+  }
+
+  statusLoading.value = true
+
+  try {
+    const pendingSubscription = restorePendingSubscription()
+    const status = await getStatus(reference.value, pendingSubscription?.userId)
+    paymentStatus.value = status.status
+
+    if (status.status === 'success') {
+      stopPolling()
+      await finalizeSubscription()
+    }
+
+    if (status.status === 'error') {
+      stopPolling()
+    }
+  } catch (error) {
+    console.error('Erreur vérification statut Jeko:', error)
+  } finally {
+    statusLoading.value = false
+  }
+}
+
+onMounted(async () => {
+  reference.value = String(route.query.reference || localStorage.getItem(JEKO_CHECKOUT_REFERENCE_KEY) || '')
+
+  await checkStatus()
+
+  if (paymentStatus.value === 'pending') {
+    pollTimer = setInterval(checkStatus, 4000)
+  }
+})
+
+onBeforeUnmount(stopPolling)
+
+useHead({
+  title: 'Statut du paiement - ALT News',
+  meta: [
+    { name: 'robots', content: 'noindex, nofollow' }
+  ]
+})
+</script>
+
+<style scoped>
+.payment-status-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  padding: 2rem;
+}
+
+.status-panel {
+  width: min(100%, 560px);
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+.status-icon {
+  width: 76px;
+  height: 76px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-bottom: 1.25rem;
+}
+
+.status-icon.pending {
+  color: #b7791f;
+  background: #fff7ed;
+}
+
+.status-icon.success {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.status-icon.error {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+h1 {
+  font-size: 1.8rem;
+  color: #111827;
+  margin-bottom: 0.75rem;
+}
+
+.message {
+  color: #4b5563;
+  margin-bottom: 1.5rem;
+}
+
+.reference-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+  color: #374151;
+  margin-bottom: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.alert-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 0.85rem 1.2rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: #d4b128;
+  color: #ffffff;
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+</style>
