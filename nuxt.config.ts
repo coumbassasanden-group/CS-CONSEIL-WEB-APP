@@ -11,6 +11,8 @@ export default defineNuxtConfig({
       apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://nextapi.coumbassa-sanden.com/api/',
       checkoutApiBase:'https://cs-pay.coumbassa-sanden.com',
       CS_JEKO_BUSINESS:'dd76c26d-0131-40b3-9e68-c493731652a3',
+      CS_JEKO_RETURN_URL: 'https://conseil.coumbassa-sanden.com/fr/subscriber/manage',
+      CS_JEKO_PROD: 100 ,
       CS_JEKO_PAYMENT_METHOD: process.env.CS_JEKO_PAYMENT_METHOD || 'wave',
     }
     //http://213.199.36.68:5020
