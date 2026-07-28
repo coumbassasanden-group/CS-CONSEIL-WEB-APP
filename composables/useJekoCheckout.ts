@@ -18,7 +18,8 @@ export interface JekoCheckoutPayload {
   business: string
   amount: number
   currency: string
-  paymentMethod: string
+  paymentMethod?: string
+  return_url?: string
   metadata?: Record<string, any>
 }
 
@@ -92,7 +93,7 @@ export const useJekoCheckout = () => {
   }
 
   const createCheckout = async (payload: JekoCheckoutPayload) => {
-    console.log("vvvvvvv------", payload)
+    // console.log("vvvvvvv------", payload)
     loading.value = true
     try {
       const data = await request<JekoCheckoutResponse | { data?: JekoCheckoutResponse; checkout?: JekoCheckoutResponse }>(

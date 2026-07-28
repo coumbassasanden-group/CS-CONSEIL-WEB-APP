@@ -337,7 +337,58 @@
         </div>
       </div>
 
-      
+      <!-- Choix du moyen de paiement pour les abonnements payants -->
+      <div v-if="isPaidJekoPlan" class="payment-methods-section">
+        <div class="selection-header">
+          <h3><Icon icon="mdi:credit-card-outline" width="24" height="24" /> Moyen de paiement</h3>
+          <p class="selection-subtitle">Sélectionnez le moyen que vous souhaitez utiliser</p>
+          <span class="required-badge">Obligatoire</span>
+        </div>
+
+        <div v-if="jekoMethodsLoading" class="payment-methods-loading">
+          Chargement des moyens de paiement...
+        </div>
+
+        <div v-else-if="jekoMethodsError" class="alert alert-error">
+          {{ jekoMethodsError }}
+          <button type="button" class="btn btn-secondary mt-3" @click="loadJekoPaymentMethods">
+            Réessayer
+          </button>
+        </div>
+
+        <div v-else class="payment-methods-grid">
+          <label
+            v-for="method in jekoPaymentMethods"
+            :key="getJekoPaymentMethodValue(method)"
+            class="payment-method-card"
+            :class="{ selected: esjekoPaymentMethod === getJekoPaymentMethodValue(method) }"
+          >
+            <input
+              v-model="esjekoPaymentMethod"
+              type="radio"
+              name="jeko-payment-method"
+              :value="getJekoPaymentMethodValue(method)"
+              :disabled="!getJekoPaymentMethodValue(method) || isProcessing || isPaying"
+            />
+            <span class="method-logo">
+              <img
+                v-if="method.logo"
+                :src="getJekoPaymentMethodLogo(method.logo)"
+                :alt="method.name || method.code || 'Moyen de paiement'"
+              />
+              <Icon v-else icon="mdi:wallet-outline" width="26" height="26" />
+            </span>
+            <span class="method-name">{{ method.name || method.code || method.id }}</span>
+          </label>
+        </div>
+
+        <div
+          v-if="!jekoMethodsLoading && !jekoMethodsError && !jekoPaymentMethods.length"
+          class="alert alert-warning mt-3"
+        >
+          Aucun moyen de paiement n'est disponible pour le moment.
+        </div>
+      </div>
 
       <!-- Affichage des erreurs -->
       <div v-if="errorMessage" class="alert alert-error mt-3">
@@ -381,7 +432,7 @@
       <div class="button-group mt-4">
         <button
           @click="handleCreateSubscription"
-          :disabled="isProcessing || isPaying || (isStudentPlan && !studentProofFile)"
+          :disabled="isProcessing || isPaying || (isStudentPlan && !studentProofFile) || (isPaidJekoPlan && !esjekoPaymentMethod)"
           class="btn btn-primary btn-lg"
         >
           <span v-if="isProcessing">Création de l'abonnement...</span>
@@ -478,6 +529,7 @@ import {
   JEKO_CHECKOUT_DETAILS_KEY,
   JEKO_CHECKOUT_REFERENCE_KEY,
   JEKO_PENDING_SUBSCRIPTION_KEY,
+  type JekoPaymentMethod,
   useJekoCheckout
 } from '~/composables/useJekoCheckout'
 import Cinetpay from '~/components/Cinetpay.vue'
@@ -485,13 +537,20 @@ import {Icon} from "@iconify/vue"
 
 const router = useRouter()
 const config = useRuntimeConfig()
+const CS_JEKO_PROD = Number(config.public.CS_JEKO_PROD ?? 1)
 const { isLoggedIn, getAuthUser } = useAuth()
 const {
   createCheckout: createJekoCheckout,
-  error: jekoCheckoutError
+  error: jekoCheckoutError,
+  getMethods: getJekoPaymentMethods,
+  logoUrl: getJekoPaymentMethodLogo
 } = useJekoCheckout()
 const cinetpayRef = ref<InstanceType<typeof Cinetpay> | null>(null)
 const isPaying = ref(false)
+const jekoMethodsLoading = ref(false)
+const jekoMethodsError = ref('')
+const jekoPaymentMethods = ref<JekoPaymentMethod[]>([])
+const esjekoPaymentMethod = ref('')
 
 // Emits pour communiquer avec le parent
 const emit = defineEmits<{
@@ -570,11 +629,7 @@ const selectedPlanDetails = ref<any>(null)
 // Debug: surveiller si le recap devrait s'afficher
 const shouldShowRecap = computed(() => {
   const result = currentStep.value === 'select-plan' && !!subscriptionForm.value.planId && !!subscriptionForm.value.userId
-  console.log('🧮 shouldShowRecap computed:', result, {
-    currentStep: currentStep.value,
-    planId: subscriptionForm.value.planId,
-    userId: subscriptionForm.value.userId
-  })
+
   return result
 })
 
@@ -586,13 +641,47 @@ const jekoBusiness = computed(() => {
   return String(config.public.CS_JEKO_BUSINESS || '')
 })
 
-const jekoPaymentMethod = computed(() => {
-  return String(config.public.CS_JEKO_PAYMENT_METHOD || 'wave')
+const jekoReturnUrl = computed(() => {
+  return String(config.public.CS_JEKO_RETURN_URL || '')
 })
 
 const isPaidJekoPlan = computed(() => {
   return shouldShowRecap.value && subscriptionForm.value.planId !== freePlan.value && selectedPlanPrice.value > 0
 })
+
+const getJekoPaymentMethodValue = (method: JekoPaymentMethod) => {
+  return String(method.code || method.id || '')
+}
+
+const loadJekoPaymentMethods = async () => {
+  if (jekoMethodsLoading.value) return
+
+  jekoMethodsLoading.value = true
+  jekoMethodsError.value = ''
+
+  try {
+    jekoPaymentMethods.value = await getJekoPaymentMethods()
+
+    const selectedMethodStillExists = jekoPaymentMethods.value.some(
+      method => getJekoPaymentMethodValue(method) === esjekoPaymentMethod.value
+    )
+    if (!selectedMethodStillExists) {
+      esjekoPaymentMethod.value = ''
+    }
+  } catch (error: any) {
+    jekoPaymentMethods.value = []
+    esjekoPaymentMethod.value = ''
+    jekoMethodsError.value = error?.message || 'Impossible de charger les moyens de paiement'
+  } finally {
+    jekoMethodsLoading.value = false
+  }
+}
+
+watch(isPaidJekoPlan, (isPaidPlan) => {
+  if (isPaidPlan && !jekoPaymentMethods.value.length) {
+    loadJekoPaymentMethods()
+  }
+}, { immediate: true })
 
 // Vérification email en temps réel
 const emailExistsWarning = ref(false)
@@ -977,8 +1066,18 @@ const payWithJeko = async (amount: number) => {
     return
   }
 
+  if (!esjekoPaymentMethod.value) {
+    errorMessage.value = 'Veuillez sélectionner un moyen de paiement'
+    return
+  }
+
   if (!jekoBusiness.value) {
     errorMessage.value = 'Configuration Jeko incomplète: CS_JEKO_BUSINESS est manquant'
+    return
+  }
+
+  if (!jekoReturnUrl.value) {
+    errorMessage.value = 'Configuration Jeko incomplète: CS_JEKO_RETURN_URL est manquant'
     return
   }
 
@@ -996,9 +1095,10 @@ const payWithJeko = async (amount: number) => {
     const checkout = await createJekoCheckout({
       userId: normalizeJekoUserId(subscriptionForm.value.userId),
       business: jekoBusiness.value,
-      amount,
+      amount: amount * CS_JEKO_PROD,
       currency: 'XOF',
-      paymentMethod: jekoPaymentMethod.value,
+      paymentMethod: esjekoPaymentMethod.value,
+      // return_url: jekoReturnUrl.value,
       metadata: {
         source: 'nuxt',
         planId: subscriptionForm.value.planId,
