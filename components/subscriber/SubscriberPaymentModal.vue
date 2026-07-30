@@ -46,11 +46,65 @@
           </div>
         </div>
 
-        <slot name="payment-provider"></slot>
+        <div class="payment-methods">
+          <div class="payment-methods-header">
+            <span>Moyen de paiement</span>
+            <small>Propulsé par Jeko</small>
+          </div>
 
-        <button @click="handlePay" class="btn-pay" :disabled="!isPhoneValid">
-          <Icon icon="mdi:credit-card" />
-          Payer {{ formatPrice(unitPrice) }}
+          <div v-if="methodsLoading" class="payment-state">
+            <Icon icon="mdi:loading" class="spin" />
+            Chargement des moyens de paiement...
+          </div>
+
+          <div v-else-if="methodsError" class="payment-state payment-state-error">
+            <span>{{ methodsError }}</span>
+            <button type="button" class="btn-retry" @click="loadPaymentMethods">
+              Réessayer
+            </button>
+          </div>
+
+          <div v-else-if="paymentMethods.length" class="payment-methods-grid">
+            <label
+              v-for="method in paymentMethods"
+              :key="getPaymentMethodValue(method)"
+              class="payment-method-card"
+              :class="{ selected: selectedPaymentMethod === getPaymentMethodValue(method) }"
+            >
+              <input
+                v-model="selectedPaymentMethod"
+                type="radio"
+                name="edition-jeko-payment-method"
+                :value="getPaymentMethodValue(method)"
+                :disabled="isPaying || !getPaymentMethodValue(method)"
+              />
+              <span class="method-logo">
+                <img
+                  v-if="method.logo"
+                  :src="getPaymentMethodLogo(method.logo)"
+                  :alt="method.name || method.code || 'Moyen de paiement'"
+                />
+                <Icon v-else icon="mdi:wallet-outline" />
+              </span>
+              <span>{{ method.name || method.code || method.id }}</span>
+            </label>
+          </div>
+
+          <div v-else class="payment-state payment-state-error">
+            Aucun moyen de paiement n'est disponible.
+          </div>
+        </div>
+
+        <p v-if="checkoutError" class="checkout-error">{{ checkoutError }}</p>
+
+        <button
+          type="button"
+          class="btn-pay"
+          :disabled="!canPay"
+          @click="handlePay"
+        >
+          <Icon :icon="isPaying ? 'mdi:loading' : 'mdi:credit-card'" :class="{ spin: isPaying }" />
+          {{ isPaying ? 'Redirection vers Jeko...' : `Payer ${formatPrice(unitPrice)}` }}
         </button>
       </div>
     </div>
@@ -59,7 +113,15 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Icon } from "@iconify/vue"
+import { Icon } from '@iconify/vue'
+import {
+  JEKO_CHECKOUT_DETAILS_KEY,
+  JEKO_CHECKOUT_REFERENCE_KEY,
+  JEKO_PENDING_EDITION_PURCHASE_KEY,
+  type JekoPaymentMethod,
+  useJekoCheckout
+} from '~/composables/useJekoCheckout'
+import { useAuth } from '~/composables/useAuth'
 
 interface Edition {
   id: number | string
@@ -78,18 +140,71 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  pay: [phone: string]
 }>()
+
+const config = useRuntimeConfig()
+const route = useRoute()
+const { getAuthUser } = useAuth()
+const {
+  createCheckout,
+  error: jekoError,
+  getMethods,
+  logoUrl: getPaymentMethodLogo
+} = useJekoCheckout()
 
 // Phone state
 const phoneNumber = ref(props.initialPhone || '')
 const phoneError = ref('')
+const checkoutError = ref('')
+const methodsLoading = ref(false)
+const methodsError = ref('')
+const paymentMethods = ref<JekoPaymentMethod[]>([])
+const selectedPaymentMethod = ref('')
+const isPaying = ref(false)
+
+const amountMultiplier = computed(() => Number(config.public.CS_JEKO_PROD ?? 1))
+const jekoBusiness = computed(() => String(config.public.CS_JEKO_BUSINESS || ''))
+
+const currentLocale = computed(() => {
+  const locale = route.path.split('/')[1]
+  return ['fr', 'en'].includes(locale) ? locale : 'fr'
+})
+
+const getPaymentMethodValue = (method: JekoPaymentMethod) => {
+  return String(method.code || method.id || '')
+}
+
+const loadPaymentMethods = async () => {
+  if (methodsLoading.value) return
+
+  methodsLoading.value = true
+  methodsError.value = ''
+
+  try {
+    paymentMethods.value = await getMethods()
+    const selectionExists = paymentMethods.value.some(
+      method => getPaymentMethodValue(method) === selectedPaymentMethod.value
+    )
+    if (!selectionExists) {
+      selectedPaymentMethod.value = ''
+    }
+  } catch (error: any) {
+    paymentMethods.value = []
+    selectedPaymentMethod.value = ''
+    methodsError.value = error?.message || 'Impossible de charger les moyens de paiement'
+  } finally {
+    methodsLoading.value = false
+  }
+}
 
 // Reset phone when modal opens
 watch(() => props.show, (newVal) => {
   if (newVal) {
     phoneNumber.value = props.initialPhone || ''
     phoneError.value = ''
+    checkoutError.value = ''
+    isPaying.value = false
+    loadPaymentMethods()
   }
 })
 
@@ -99,8 +214,16 @@ const isPhoneValid = computed(() => {
   return phone.length >= 8
 })
 
+const canPay = computed(() => {
+  return isPhoneValid.value &&
+    !!props.edition &&
+    !!selectedPaymentMethod.value &&
+    !methodsLoading.value &&
+    !isPaying.value
+})
+
 // Handle pay click
-const handlePay = () => {
+const handlePay = async () => {
   const phone = phoneNumber.value.trim()
 
   if (!phone) {
@@ -114,7 +237,80 @@ const handlePay = () => {
   }
 
   phoneError.value = ''
-  emit('pay', phone)
+  checkoutError.value = ''
+
+  if (!props.edition) {
+    checkoutError.value = 'Édition introuvable'
+    return
+  }
+
+  if (!selectedPaymentMethod.value) {
+    checkoutError.value = 'Veuillez sélectionner un moyen de paiement'
+    return
+  }
+
+  if (!jekoBusiness.value) {
+    checkoutError.value = 'Configuration Jeko incomplète'
+    return
+  }
+
+  const user = getAuthUser()
+  const userId = user?.id || user?.userId || user?.subscriber_id || user?.email
+  if (!userId) {
+    checkoutError.value = 'Utilisateur connecté introuvable'
+    return
+  }
+
+  const paymentWindow = window.open('about:blank', '_blank')
+  isPaying.value = true
+
+  try {
+    const returnUrl = `${window.location.origin}/${currentLocale.value}/payment/success`
+    const transactionId = `ED-${props.edition.id}-${Date.now()}`
+    const checkout = await createCheckout({
+      userId,
+      business: jekoBusiness.value,
+      amount: props.unitPrice * amountMultiplier.value,
+      currency: 'XOF',
+      paymentMethod: selectedPaymentMethod.value,
+      return_url: returnUrl,
+      metadata: {
+        source: 'nuxt',
+        purchaseType: 'edition',
+        editionId: props.edition.id,
+        email: user?.email,
+        phone,
+        transactionId,
+        frontendReturnUrl: `${returnUrl}?reference={reference}`
+      }
+    })
+
+    const pendingPurchase = {
+      edition: props.edition,
+      transactionId,
+      reference: checkout.reference,
+      userId,
+      amount: props.unitPrice,
+      phone,
+      paymentMethod: selectedPaymentMethod.value,
+      provider: 'jeko',
+      timestamp: Date.now()
+    }
+
+    localStorage.setItem(JEKO_CHECKOUT_REFERENCE_KEY, checkout.reference)
+    localStorage.setItem(JEKO_CHECKOUT_DETAILS_KEY, JSON.stringify(checkout))
+    localStorage.setItem(JEKO_PENDING_EDITION_PURCHASE_KEY, JSON.stringify(pendingPurchase))
+
+    if (paymentWindow) {
+      paymentWindow.location.href = checkout.redirectUrl
+    } else {
+      await navigateTo(checkout.redirectUrl, { external: true })
+    }
+  } catch (error: any) {
+    paymentWindow?.close()
+    checkoutError.value = jekoError.value || error?.message || 'Impossible de démarrer le paiement Jeko'
+    isPaying.value = false
+  }
 }
 
 const imageUrl = computed(() => {
@@ -246,6 +442,117 @@ const imageUrl = computed(() => {
   margin-bottom: 1.5rem;
 }
 
+.payment-methods {
+  margin-bottom: 1.5rem;
+}
+
+.payment-methods-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.payment-methods-header small {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.payment-methods-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.payment-method-card {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.payment-method-card.selected {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+
+.payment-method-card input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.method-logo {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+}
+
+.method-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.payment-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 52px;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: #f9fafb;
+  color: #6b7280;
+  text-align: center;
+}
+
+.payment-state-error,
+.checkout-error {
+  color: #b91c1c;
+}
+
+.payment-state-error {
+  flex-direction: column;
+  background: #fef2f2;
+}
+
+.btn-retry {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: white;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.checkout-error {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .summary-row {
   display: flex;
   justify-content: space-between;
@@ -345,6 +652,10 @@ const imageUrl = computed(() => {
   .edition-preview img {
     width: 100px;
     height: 130px;
+  }
+
+  .payment-methods-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

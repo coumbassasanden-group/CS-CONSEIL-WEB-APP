@@ -2,6 +2,8 @@ export const JEKO_CHECKOUT_REFERENCE_KEY = 'jeko_checkout_reference'
 export const JEKO_CHECKOUT_DETAILS_KEY = 'jeko_checkout_details'
 export const JEKO_PENDING_SUBSCRIPTION_KEY = 'jeko_pending_subscription'
 export const JEKO_COMPLETED_REFERENCE_KEY = 'jeko_completed_reference'
+export const JEKO_PENDING_EDITION_PURCHASE_KEY = 'jeko_pending_edition_purchase'
+export const JEKO_COMPLETED_EDITION_REFERENCE_KEY = 'jeko_completed_edition_reference'
 
 export type JekoPaymentStatus = 'pending' | 'success' | 'error'
 
