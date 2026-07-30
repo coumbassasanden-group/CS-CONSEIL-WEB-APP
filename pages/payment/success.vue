@@ -41,15 +41,21 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
+  JEKO_CHECKOUT_DETAILS_KEY,
   JEKO_CHECKOUT_REFERENCE_KEY,
   JEKO_COMPLETED_REFERENCE_KEY,
+  JEKO_COMPLETED_EDITION_REFERENCE_KEY,
+  JEKO_PENDING_EDITION_PURCHASE_KEY,
   JEKO_PENDING_SUBSCRIPTION_KEY,
   useJekoCheckout,
   type JekoPaymentStatus
 } from '~/composables/useJekoCheckout'
 import { useSubscription } from '~/composables/useSubscription'
+import { useAuth } from '~/composables/useAuth'
 
 const route = useRoute()
+const config = useRuntimeConfig()
+const { getAuthToken } = useAuth()
 
 const {
   getStatus,
@@ -66,6 +72,7 @@ const paymentStatus = ref<JekoPaymentStatus>('pending')
 const statusLoading = ref(false)
 const finalizeLoading = ref(false)
 const finalizeError = ref('')
+const pendingEditionPurchase = ref<any>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const currentLocale = computed(() => {
@@ -95,9 +102,17 @@ const title = computed(() => {
 })
 
 const message = computed(() => {
-  if (finalizeLoading.value) return 'Paiement confirmé. Activation de votre abonnement en cours...'
+  if (finalizeLoading.value) {
+    return pendingEditionPurchase.value
+      ? 'Paiement confirmé. Enregistrement de votre édition en cours...'
+      : 'Paiement confirmé. Activation de votre abonnement en cours...'
+  }
   if (paymentStatus.value === 'success') return 'Votre paiement Jeko a été validé.'
-  if (paymentStatus.value === 'error') return 'Le paiement n’a pas pu être validé. Vous pouvez réessayer depuis la page d’abonnement.'
+  if (paymentStatus.value === 'error') {
+    return pendingEditionPurchase.value
+      ? 'Le paiement n’a pas pu être validé. Vous pouvez réessayer depuis votre espace abonné.'
+      : 'Le paiement n’a pas pu être validé. Vous pouvez réessayer depuis la page d’abonnement.'
+  }
   return 'Nous vérifions votre paiement. Cette page se met à jour automatiquement.'
 })
 
@@ -117,6 +132,108 @@ const restorePendingSubscription = () => {
   } catch (error) {
     console.error('Erreur restauration abonnement Jeko:', error)
     return null
+  }
+}
+
+const restorePendingEditionPurchase = () => {
+  const pending = localStorage.getItem(JEKO_PENDING_EDITION_PURCHASE_KEY)
+  if (!pending) return null
+
+  try {
+    return JSON.parse(pending)
+  } catch (error) {
+    console.error('Erreur restauration achat d’édition Jeko:', error)
+    return null
+  }
+}
+
+const finalizeEditionPurchase = async () => {
+  if (!reference.value || finalizeLoading.value || !pendingEditionPurchase.value) return
+
+  const completedReference = localStorage.getItem(JEKO_COMPLETED_EDITION_REFERENCE_KEY)
+  if (completedReference === reference.value) return
+
+  finalizeLoading.value = true
+  finalizeError.value = ''
+
+  try {
+    const pending = pendingEditionPurchase.value
+    const edition = pending.edition
+    if (!edition?.id) {
+      throw new Error('Paiement confirmé, mais les informations de l’édition sont introuvables.')
+    }
+
+    const token = getAuthToken()
+    if (!token) {
+      throw new Error('Paiement confirmé, mais votre session a expiré. Reconnectez-vous pour enregistrer l’achat.')
+    }
+
+    const response = await fetch(`${config.public.apiBaseUrl}/api/subscription/purchase-edition`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify({
+        edition_id: edition.id,
+        payment_reference: reference.value,
+        payment_method: 'jeko'
+      })
+    })
+
+    if (!response.ok) {
+      let message = 'Paiement confirmé, mais l’achat n’a pas pu être enregistré.'
+      try {
+        const data = await response.json()
+        message = data?.message || data?.error || message
+      } catch {
+        // La réponse du backend ne contient pas de JSON exploitable.
+      }
+      throw new Error(message)
+    }
+
+    const purchasedEditions = JSON.parse(localStorage.getItem('purchasedEditions') || '[]')
+    if (!purchasedEditions.some((item: any) => String(item.id) === String(edition.id))) {
+      purchasedEditions.push({
+        ...edition,
+        purchaseDate: new Date().toISOString(),
+        transactionId: pending.transactionId,
+        paymentReference: reference.value
+      })
+      localStorage.setItem('purchasedEditions', JSON.stringify(purchasedEditions))
+    }
+
+    const paymentHistory = JSON.parse(localStorage.getItem('paymentHistory') || '[]')
+    const paymentExists = paymentHistory.some(
+      (item: any) => item.paymentReference === reference.value || item.transactionId === pending.transactionId
+    )
+    if (!paymentExists) {
+      paymentHistory.push({
+        id: paymentHistory.length + 1,
+        date: new Date().toISOString(),
+        description: `Achat edition: ${edition.title}`,
+        amount: pending.amount,
+        type: 'single',
+        status: 'completed',
+        provider: 'jeko',
+        paymentMethod: pending.paymentMethod,
+        transactionId: pending.transactionId,
+        paymentReference: reference.value,
+        invoiceUrl: null
+      })
+      localStorage.setItem('paymentHistory', JSON.stringify(paymentHistory))
+    }
+
+    localStorage.setItem(JEKO_COMPLETED_EDITION_REFERENCE_KEY, reference.value)
+    localStorage.removeItem(JEKO_PENDING_EDITION_PURCHASE_KEY)
+    localStorage.removeItem(JEKO_CHECKOUT_REFERENCE_KEY)
+    localStorage.removeItem(JEKO_CHECKOUT_DETAILS_KEY)
+    pendingEditionPurchase.value = null
+  } catch (error: any) {
+    finalizeError.value = error?.message || 'Erreur lors de l’enregistrement de votre achat'
+  } finally {
+    finalizeLoading.value = false
   }
 }
 
@@ -143,6 +260,7 @@ const finalizeSubscription = async () => {
     localStorage.setItem(JEKO_COMPLETED_REFERENCE_KEY, reference.value)
     localStorage.removeItem(JEKO_PENDING_SUBSCRIPTION_KEY)
     localStorage.removeItem(JEKO_CHECKOUT_REFERENCE_KEY)
+    localStorage.removeItem(JEKO_CHECKOUT_DETAILS_KEY)
     localStorage.removeItem('selectedPlan')
   } catch (error: any) {
     finalizeError.value = error?.message || 'Erreur lors de l’activation de votre abonnement'
@@ -161,12 +279,19 @@ const checkStatus = async () => {
 
   try {
     const pendingSubscription = restorePendingSubscription()
-    const status = await getStatus(reference.value, pendingSubscription?.userId)
+    const status = await getStatus(
+      reference.value,
+      pendingEditionPurchase.value?.userId || pendingSubscription?.userId
+    )
     paymentStatus.value = status.status
 
     if (status.status === 'success') {
       stopPolling()
-      await finalizeSubscription()
+      if (pendingEditionPurchase.value) {
+        await finalizeEditionPurchase()
+      } else {
+        await finalizeSubscription()
+      }
     }
 
     if (status.status === 'error') {
@@ -180,6 +305,7 @@ const checkStatus = async () => {
 }
 
 onMounted(async () => {
+  pendingEditionPurchase.value = restorePendingEditionPurchase()
   reference.value = String(route.query.reference || localStorage.getItem(JEKO_CHECKOUT_REFERENCE_KEY) || '')
 
   await checkStatus()

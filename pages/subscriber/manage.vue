@@ -342,23 +342,7 @@
       :format-price="formatPriceDisplay"
       :initial-phone="getAuthUser()?.phone || ''"
       @close="closePaymentModal"
-      @pay="startPayment"
-    >
-      <template #payment-provider>
-        <Cinetpay
-          ref="cinetpayRef"
-          :structure="'CS Conseil'"
-          :userName="getAuthUser()?.firstName || ''"
-          :phone="paymentPhone"
-          :email="getAuthUser()?.email || ''"
-          :amount="UNIT_PRICE"
-          :service="`Achat edition ALT News: ${editionToBuy?.title || ''}`"
-          :firstName="getAuthUser()?.firstName || ''"
-          :lastName="getAuthUser()?.lastName || ''"
-          :transactionId="paymentTransactionId"
-        />
-      </template>
-    </SubscriberPaymentModal>
+    />
 
     <!-- Modal d'upgrade de plan -->
     <Teleport to="body">
@@ -385,13 +369,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useSubscription } from '~/composables/useSubscription'
 import { useAuth } from '~/composables/useAuth'
 import { useRoute, navigateTo } from '#app'
 import { Icon } from "@iconify/vue"
 import { useI18n } from 'vue-i18n'
-import Cinetpay from '~/components/Cinetpay.vue'
 import SubscriptionCompo from '~/components/SubscriptionCompo.vue'
 import LoginModal from '~/components/LoginModal.vue'
 
@@ -429,16 +412,12 @@ const activeTab = ref('profile')
 const showNewsModal = ref(false)
 const selectedNews = ref<any>(null)
 
-// CinetPay state for unit purchases
-const cinetpayRef = ref<InstanceType<typeof Cinetpay> | null>(null)
 const showPaymentModal = ref(false)
 
 // Modal pour upgrade de plan
 const showUpgradeModal = ref(false)
 const showLoginModal = ref(false)
 const editionToBuy = ref<any>(null)
-const paymentTransactionId = ref('')
-const paymentPhone = ref('') // Phone from payment modal
 const UNIT_PRICE = 2000 // Prix unitaire en FCFA
 
 // Password change form
@@ -661,84 +640,12 @@ const isEditionPurchased = (editionId: number | string) => {
 
 const buyEdition = (edition: any) => {
   editionToBuy.value = edition
-  paymentTransactionId.value = `ED-${edition.id}-${Date.now()}`
   showPaymentModal.value = true
-}
-
-const startPayment = (phone: string) => {
-  if (cinetpayRef.value && editionToBuy.value) {
-    // Store the phone for Cinetpay
-    paymentPhone.value = phone
-
-    const pendingPurchase = {
-      edition: editionToBuy.value,
-      transactionId: paymentTransactionId.value,
-      amount: UNIT_PRICE,
-      phone: phone,
-      timestamp: Date.now()
-    }
-    localStorage.setItem('pendingEditionPurchase', JSON.stringify(pendingPurchase))
-
-    // Wait for next tick to ensure phone is passed to Cinetpay
-    nextTick(() => {
-      cinetpayRef.value?.checkout(handlePaymentSuccess)
-    })
-  }
-}
-
-const handlePaymentSuccess = () => {
-  confirmPendingPurchase()
-}
-
-const confirmPendingPurchase = () => {
-  const pendingData = localStorage.getItem('pendingEditionPurchase')
-  if (!pendingData) return
-
-  try {
-    const pending = JSON.parse(pendingData)
-    const edition = pending.edition
-
-    if (isEditionPurchased(edition.id)) {
-      localStorage.removeItem('pendingEditionPurchase')
-      return
-    }
-
-    const purchasedEdition = {
-      ...edition,
-      purchaseDate: new Date().toISOString(),
-      transactionId: pending.transactionId
-    }
-
-    myPurchasedEditions.value.push(purchasedEdition)
-    localStorage.setItem('purchasedEditions', JSON.stringify(myPurchasedEditions.value))
-
-    const newPayment = {
-      id: paymentHistory.value.length + 1,
-      date: new Date().toISOString(),
-      description: `Achat edition: ${edition.title}`,
-      amount: pending.amount,
-      type: 'single',
-      status: 'completed',
-      transactionId: pending.transactionId,
-      invoiceUrl: null
-    }
-    paymentHistory.value.push(newPayment)
-    localStorage.setItem('paymentHistory', JSON.stringify(paymentHistory.value))
-
-    localStorage.removeItem('pendingEditionPurchase')
-    showPaymentModal.value = false
-    editionToBuy.value = null
-    showToast(`Édition "${edition.title}" achetée avec succès !`, 'success')
-  } catch (e) {
-    console.error('Erreur lors de la confirmation de l\'achat:', e)
-    showToast('Erreur lors de la confirmation de l\'achat', 'error')
-  }
 }
 
 const closePaymentModal = () => {
   showPaymentModal.value = false
   editionToBuy.value = null
-  paymentPhone.value = ''
 }
 
 const handleLogout = () => {
@@ -1106,20 +1013,6 @@ onMounted(async () => {
     fetchMyEditions(),
     fetchPaymentHistory()
   ])
-
-  const pendingPurchase = localStorage.getItem('pendingEditionPurchase')
-  if (pendingPurchase) {
-    try {
-      const pending = JSON.parse(pendingPurchase)
-      if (Date.now() - pending.timestamp < 5 * 60 * 1000) {
-        confirmPendingPurchase()
-      } else {
-        localStorage.removeItem('pendingEditionPurchase')
-      }
-    } catch (e) {
-      localStorage.removeItem('pendingEditionPurchase')
-    }
-  }
 
   isLoading.value = false
 })
