@@ -11,101 +11,105 @@
       </div>
 
       <div class="modal-body">
-        <div v-if="edition" class="edition-preview">
-          <img :src="imageUrl" :alt="edition.title" />
-          <div class="edition-info">
-            <h3>{{ edition.title }}</h3>
-            <p class="edition-price">{{ formatPrice(unitPrice) }}</p>
-          </div>
-        </div>
-
-        <!-- Champ telephone -->
-        <div class="phone-input-wrapper">
-          <label for="phone" class="phone-label">
-            <Icon icon="mdi:phone" /> Numero de telephone
-          </label>
-          <input
-            type="tel"
-            id="phone"
-            v-model="phoneNumber"
-            placeholder="Ex: 0701020304"
-            class="phone-input"
-            :class="{ 'has-error': phoneError }"
-          />
-          <p v-if="phoneError" class="phone-error">{{ phoneError }}</p>
-        </div>
-
-        <div class="payment-summary">
-          <div class="summary-row">
-            <span>Prix de l'edition</span>
-            <span>{{ formatPrice(unitPrice) }}</span>
-          </div>
-          <div class="summary-row total">
-            <span>Total a payer</span>
-            <span>{{ formatPrice(unitPrice) }}</span>
-          </div>
-        </div>
-
-        <div class="payment-methods">
-          <div class="payment-methods-header">
-            <span>Moyen de paiement</span>
-            <small>Propulsé par Jeko</small>
+        <div class="payment-details-column">
+          <div v-if="edition" class="edition-preview">
+            <img :src="imageUrl" :alt="edition.title" />
+            <div class="edition-info">
+              <h3>{{ edition.title }}</h3>
+              <p class="edition-price">{{ formatPrice(unitPrice) }}</p>
+            </div>
           </div>
 
-          <div v-if="methodsLoading" class="payment-state">
-            <Icon icon="mdi:loading" class="spin" />
-            Chargement des moyens de paiement...
-          </div>
-
-          <div v-else-if="methodsError" class="payment-state payment-state-error">
-            <span>{{ methodsError }}</span>
-            <button type="button" class="btn-retry" @click="loadPaymentMethods">
-              Réessayer
-            </button>
-          </div>
-
-          <div v-else-if="paymentMethods.length" class="payment-methods-grid">
-            <label
-              v-for="method in paymentMethods"
-              :key="getPaymentMethodValue(method)"
-              class="payment-method-card"
-              :class="{ selected: selectedPaymentMethod === getPaymentMethodValue(method) }"
-            >
-              <input
-                v-model="selectedPaymentMethod"
-                type="radio"
-                name="edition-jeko-payment-method"
-                :value="getPaymentMethodValue(method)"
-                :disabled="isPaying || !getPaymentMethodValue(method)"
-              />
-              <span class="method-logo">
-                <img
-                  v-if="method.logo"
-                  :src="getPaymentMethodLogo(method.logo)"
-                  :alt="method.name || method.code || 'Moyen de paiement'"
-                />
-                <Icon v-else icon="mdi:wallet-outline" />
-              </span>
-              <span>{{ method.name || method.code || method.id }}</span>
+          <!-- Champ telephone -->
+          <div class="phone-input-wrapper">
+            <label for="phone" class="phone-label">
+              <Icon icon="mdi:phone" /> Numero de telephone
             </label>
+            <input
+              type="tel"
+              id="phone"
+              v-model="phoneNumber"
+              placeholder="Ex: 0701020304"
+              class="phone-input"
+              :class="{ 'has-error': phoneError }"
+            />
+            <p v-if="phoneError" class="phone-error">{{ phoneError }}</p>
           </div>
 
-          <div v-else class="payment-state payment-state-error">
-            Aucun moyen de paiement n'est disponible.
+          <div class="payment-summary">
+            <div class="summary-row">
+              <span>Prix de l'edition</span>
+              <span>{{ formatPrice(unitPrice) }}</span>
+            </div>
+            <div class="summary-row total">
+              <span>Total a payer</span>
+              <span>{{ formatPrice(unitPrice) }}</span>
+            </div>
           </div>
         </div>
 
-        <p v-if="checkoutError" class="checkout-error">{{ checkoutError }}</p>
+        <div class="payment-checkout-column">
+          <div class="payment-methods">
+            <div class="payment-methods-header">
+              <span>Moyen de paiement</span>
+              <small>Propulsé par Jeko</small>
+            </div>
 
-        <button
-          type="button"
-          class="btn-pay"
-          :disabled="!canPay"
-          @click="handlePay"
-        >
-          <Icon :icon="isPaying ? 'mdi:loading' : 'mdi:credit-card'" :class="{ spin: isPaying }" />
-          {{ isPaying ? 'Redirection vers Jeko...' : `Payer ${formatPrice(unitPrice)}` }}
-        </button>
+            <div v-if="methodsLoading" class="payment-state">
+              <Icon icon="mdi:loading" class="spin" />
+              Chargement des moyens de paiement...
+            </div>
+
+            <div v-else-if="methodsError" class="payment-state payment-state-error">
+              <span>{{ methodsError }}</span>
+              <button type="button" class="btn-retry" @click="loadPaymentMethods">
+                Réessayer
+              </button>
+            </div>
+
+            <div v-else-if="paymentMethods.length" class="payment-methods-grid">
+              <label
+                v-for="method in paymentMethods"
+                :key="getPaymentMethodValue(method)"
+                class="payment-method-card"
+                :class="{ selected: selectedPaymentMethod === getPaymentMethodValue(method) }"
+              >
+                <input
+                  v-model="selectedPaymentMethod"
+                  type="radio"
+                  name="edition-jeko-payment-method"
+                  :value="getPaymentMethodValue(method)"
+                  :disabled="isPaying || !getPaymentMethodValue(method)"
+                />
+                <span class="method-logo">
+                  <img
+                    v-if="method.logo"
+                    :src="getPaymentMethodLogo(method.logo)"
+                    :alt="method.name || method.code || 'Moyen de paiement'"
+                  />
+                  <Icon v-else icon="mdi:wallet-outline" />
+                </span>
+                <span>{{ method.name || method.code || method.id }}</span>
+              </label>
+            </div>
+
+            <div v-else class="payment-state payment-state-error">
+              Aucun moyen de paiement n'est disponible.
+            </div>
+          </div>
+
+          <p v-if="checkoutError" class="checkout-error">{{ checkoutError }}</p>
+
+          <button
+            type="button"
+            class="btn-pay"
+            :disabled="!canPay"
+            @click="handlePay"
+          >
+            <Icon :icon="isPaying ? 'mdi:loading' : 'mdi:credit-card'" :class="{ spin: isPaying }" />
+            {{ isPaying ? 'Redirection vers Jeko...' : `Payer ${formatPrice(unitPrice)}` }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -335,9 +339,10 @@ const imageUrl = computed(() => {
 .payment-modal {
   background: white;
   border-radius: 20px;
-  max-width: 480px;
+  max-width: 960px;
   width: 100%;
   position: relative;
+  overflow: hidden;
   animation: modalSlideIn 0.3s ease;
 }
 
@@ -378,13 +383,13 @@ const imageUrl = computed(() => {
 
 .modal-header {
   text-align: center;
-  padding: 2rem 2rem 1rem;
+  padding: 1.25rem 4rem 1rem;
 }
 
 .modal-icon {
-  font-size: 3rem;
+  font-size: 2.25rem;
   color: #10b981;
-  margin-bottom: 1rem;
+  margin-bottom: 0.35rem;
 }
 
 .modal-header h2 {
@@ -395,7 +400,20 @@ const imageUrl = computed(() => {
 }
 
 .modal-body {
-  padding: 0 2rem 2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1.5rem;
+  padding: 0 2rem 1.5rem;
+}
+
+.payment-details-column,
+.payment-checkout-column {
+  min-width: 0;
+}
+
+.payment-checkout-column {
+  display: flex;
+  flex-direction: column;
 }
 
 .edition-preview {
@@ -439,11 +457,11 @@ const imageUrl = computed(() => {
   background: #f9fafb;
   border-radius: 12px;
   padding: 1.25rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
 }
 
 .payment-methods {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .payment-methods-header {
@@ -462,7 +480,7 @@ const imageUrl = computed(() => {
 
 .payment-methods-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.75rem;
 }
 
@@ -642,7 +660,36 @@ const imageUrl = computed(() => {
   color: #ef4444;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 767px) {
+  .payment-modal-overlay {
+    align-items: flex-start;
+  }
+
+  .payment-modal {
+    max-width: 480px;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .modal-header {
+    padding: 2rem 2rem 1rem;
+  }
+
+  .modal-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .modal-body {
+    display: block;
+    padding: 0 2rem 2rem;
+  }
+
+  .payment-summary {
+    margin-bottom: 1.5rem;
+  }
+
   .edition-preview {
     flex-direction: column;
     align-items: center;
