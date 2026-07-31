@@ -39,8 +39,38 @@ const loginForm = ref({
     password: ''
 });
 
-// CinetPay ref
-const cinetpayRef = ref(null);
+// —————————————————————————— Paiement Paxity
+// Aucune clé côté navigateur : tout passe par /api/payment/paxity/**.
+const {
+    createCheckout: createPaxityCheckout,
+    getMethods: getPaxityMethods,
+    waitForCompletion: waitForPaxityCompletion,
+    error: paxityError
+} = usePaxityCheckout();
+
+const paymentMethods = ref([]);
+const selectedMethodId = ref('');
+const methodsLoading = ref(false);
+const methodsError = ref('');
+const paymentError = ref('');
+const paymentPhone = ref('');
+const awaitingMessage = ref('');
+
+const loadPaymentMethods = async () => {
+    if (paymentMethods.value.length) return;
+    methodsLoading.value = true;
+    methodsError.value = '';
+    try {
+        paymentMethods.value = await getPaxityMethods('CI');
+        if (!selectedMethodId.value && paymentMethods.value.length) {
+            selectedMethodId.value = paymentMethods.value[0].id;
+        }
+    } catch (error) {
+        methodsError.value = 'Impossible de charger les moyens de paiement.';
+    } finally {
+        methodsLoading.value = false;
+    }
+};
 
 // Generate transaction ID
 const generateTransactionId = () => {
@@ -242,38 +272,67 @@ const downloadEdition = async (edition) => {
 const openPaymentModal = (edition) => {
     selectedEdition.value = edition;
     transactionId.value = generateTransactionId();
+    paymentPhone.value = subscriber.value?.phone || '';
+    paymentError.value = '';
+    awaitingMessage.value = '';
     showPaymentModal.value = true;
+    loadPaymentMethods();
 };
 
-// Process payment for edition
+/**
+ * Achat d'une édition via Paxity.
+ *
+ * Remplace CinetPay, dont le CDN répond 522 : le script ne se chargeait jamais
+ * et l'achat restait bloqué sur « Impossible de charger le système de paiement ».
+ */
 const processEditionPayment = async () => {
     if (!selectedEdition.value) return;
-    
+
+    const phone = (paymentPhone.value || '').trim();
+    if (phone.length < 8) {
+        paymentError.value = 'Numéro de téléphone invalide.';
+        return;
+    }
+    if (!selectedMethodId.value) {
+        paymentError.value = 'Veuillez choisir un moyen de paiement.';
+        return;
+    }
+
+    paymentError.value = '';
     processingPayment.value = true;
-    
-    // Wait for CinetPay to load
-    const waitForCinetPay = () => {
-        return new Promise((resolve) => {
-            const checkInterval = setInterval(() => {
-                if (cinetpayRef.value && cinetpayRef.value.isCinetPayLoaded) {
-                    clearInterval(checkInterval);
-                    resolve();
-                }
-            }, 100);
-            setTimeout(() => {
-                clearInterval(checkInterval);
-                resolve();
-            }, 10000);
+
+    try {
+        const checkout = await createPaxityCheckout({
+            method: selectedMethodId.value,
+            amount: selectedEdition.value.price || 2000,
+            phone,
+            reference: transactionId.value,
+            description: `ALT News - ${selectedEdition.value.title}`
         });
-    };
-    
-    await waitForCinetPay();
-    
-    if (cinetpayRef.value && cinetpayRef.value.checkout) {
-        cinetpayRef.value.checkout(handleEditionPaymentSuccess);
-    } else {
-        alert('Impossible de charger le système de paiement');
+
+        if (checkout.redirectUrl) {
+            window.open(checkout.redirectUrl, '_blank', 'noopener');
+        }
+
+        awaitingMessage.value = checkout.redirectUrl
+            ? 'Finalisez le paiement dans l\'onglet ouvert. Cette page se met à jour automatiquement.'
+            : 'Validez le paiement sur votre téléphone. Cette page se met à jour automatiquement.';
+
+        const final = await waitForPaxityCompletion(checkout.reference);
+
+        if (final.status === 'SUCCESS') {
+            await handleEditionPaymentSuccess();
+        } else if (final.status === 'FAILED') {
+            paymentError.value = 'Le paiement a été refusé ou annulé.';
+        } else {
+            paymentError.value = `Paiement non confirmé à temps. Si vous avez été débité, contactez-nous avec la référence ${checkout.reference}.`;
+        }
+    } catch (error) {
+        // Pas de relance automatique : la transaction a pu aboutir côté Paxity.
+        paymentError.value = paxityError.value || 'Le paiement n\'a pas pu être initié.';
+    } finally {
         processingPayment.value = false;
+        awaitingMessage.value = '';
     }
 };
 
@@ -794,18 +853,36 @@ useHead({
                                 <h4 class="mb-0 text-gold">{{ formatPrice(selectedEdition.price || 100) }}</h4>
                             </div>
                             
-                            <Cinetpay
-                                ref="cinetpayRef"
-                                :structure="'CS-CONSEIL'"
-                                :userName="subscriber?.first_name + ' ' + subscriber?.last_name"
-                                :firstName="subscriber?.first_name || ''"
-                                :lastName="subscriber?.last_name || ''"
-                                :phone="subscriber?.phone || ''"
-                                :email="subscriber?.email || ''"
-                                :amount="selectedEdition.price || 2000"
-                                :service="'ALT News - ' + selectedEdition.title"
-                                :transactionId="transactionId"
-                            />
+                            <div class="mb-3 text-start">
+                                <label class="form-label fw-semibold">Numéro de téléphone</label>
+                                <input
+                                    v-model="paymentPhone"
+                                    type="tel"
+                                    class="form-control"
+                                    placeholder="Ex: 0701020304"
+                                />
+                            </div>
+
+                            <div class="mb-3 text-start">
+                                <label class="form-label fw-semibold">Moyen de paiement</label>
+                                <p v-if="methodsLoading" class="text-muted small mb-0">Chargement…</p>
+                                <p v-else-if="methodsError" class="text-danger small mb-0">{{ methodsError }}</p>
+                                <div v-else class="d-flex flex-wrap gap-2">
+                                    <button
+                                        v-for="method in paymentMethods"
+                                        :key="method.id"
+                                        type="button"
+                                        class="btn btn-sm"
+                                        :class="selectedMethodId === method.id ? 'btn-dark' : 'btn-outline-secondary'"
+                                        @click="selectedMethodId = method.id"
+                                    >
+                                        {{ method.name }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <p v-if="paymentError" class="text-danger small">{{ paymentError }}</p>
+                            <p v-if="awaitingMessage" class="text-muted small">{{ awaitingMessage }}</p>
                             
                             <button @click="processEditionPayment" 
                                     class="btn bg-gold text-white w-100 mt-3"

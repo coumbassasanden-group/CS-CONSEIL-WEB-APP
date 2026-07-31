@@ -505,19 +505,6 @@
     </section>
   </div>
   
-  <!-- Composant Cinetpay pour le paiement -->
-  <Cinetpay
-    ref="cinetpayRef"
-    :first-name="subscriptionForm.firstName"
-    :last-name="subscriptionForm.lastName"
-    :user-name="subscriptionForm.firstName + ' ' + subscriptionForm.lastName"
-    :amount="selectedPlanDetails?.price || 0"
-    :email="subscriptionForm.email"
-    :phone="subscriptionForm.phone"
-    :structure="'CS-CONSEIL'"
-    :service="'Subscription'"
-    :transaction-id="transactionId"
-  />
 </template>
 
 <script setup lang="ts">
@@ -532,7 +519,6 @@ import {
   type JekoPaymentMethod,
   useJekoCheckout
 } from '~/composables/useJekoCheckout'
-import Cinetpay from '~/components/Cinetpay.vue'
 import {Icon} from "@iconify/vue"
 
 const router = useRouter()
@@ -545,7 +531,6 @@ const {
   getMethods: getJekoPaymentMethods,
   logoUrl: getJekoPaymentMethodLogo
 } = useJekoCheckout()
-const cinetpayRef = ref<InstanceType<typeof Cinetpay> | null>(null)
 const isPaying = ref(false)
 const jekoMethodsLoading = ref(false)
 const jekoMethodsError = ref('')

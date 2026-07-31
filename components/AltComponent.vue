@@ -4,7 +4,6 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '~/composables/useAuth';
 import LoginModal from '~/components/LoginModal.vue';
-import Cinetpay from '~/components/Cinetpay.vue';
 
 const config = useRuntimeConfig();
 const { locale } = useI18n();
@@ -32,8 +31,48 @@ const selectedEditionForPurchase = ref(null);
 const paymentTransactionId = ref('');
 const paymentPhone = ref('');
 const phoneError = ref('');
-const cinetpayRef = ref(null);
 const UNIT_PRICE = 2000;
+
+// —————————————————————————— Paiement Paxity
+// Remplace CinetPay, dont le CDN (cdn.cinetpay.com/seamless/main.js) répond 522
+// et rendait l'achat d'une édition impossible. Aucune clé n'est manipulée ici :
+// tout passe par les routes /api/payment/paxity/** du serveur Nitro.
+const {
+    createCheckout: createPaxityCheckout,
+    getMethods: getPaxityMethods,
+    waitForCompletion: waitForPaxityCompletion,
+    error: paxityError
+} = usePaxityCheckout();
+
+const paymentMethods = ref([]);
+const selectedMethodId = ref('');
+const methodsLoading = ref(false);
+const methodsError = ref('');
+const paymentError = ref('');
+const isPaying = ref(false);
+const awaitingValidation = ref(false);
+const awaitingMessage = ref('');
+
+const selectedMethod = computed(
+    () => paymentMethods.value.find((method) => method.id === selectedMethodId.value) || null
+);
+
+/** Charge les moyens actifs. Le catalogue peut changer sans préavis côté Paxity. */
+const loadPaymentMethods = async () => {
+    if (paymentMethods.value.length) return;
+    methodsLoading.value = true;
+    methodsError.value = '';
+    try {
+        paymentMethods.value = await getPaxityMethods('CI');
+        if (!selectedMethodId.value && paymentMethods.value.length) {
+            selectedMethodId.value = paymentMethods.value[0].id;
+        }
+    } catch (error) {
+        methodsError.value = 'Impossible de charger les moyens de paiement. Réessayez dans un instant.';
+    } finally {
+        methodsLoading.value = false;
+    }
+};
 
 // Filtres et recherche
 const activeFilter = ref('all'); // 'all', 'free', 'premium'
@@ -189,7 +228,9 @@ const openPaymentModal = () => {
     const user = getAuthUser();
     paymentPhone.value = user?.phone || '';
     phoneError.value = '';
+    paymentError.value = '';
     showPaymentModal.value = true;
+    loadPaymentMethods();
 };
 
 // Fermer le modal de paiement
@@ -198,6 +239,8 @@ const closePaymentModal = () => {
     selectedEditionForPurchase.value = null;
     paymentPhone.value = '';
     phoneError.value = '';
+    paymentError.value = '';
+    awaitingValidation.value = false;
 };
 
 // Callback après connexion réussie
@@ -225,8 +268,8 @@ const onRegisterClick = () => {
     router.push(`/${currentLocale.value}/subscriber`);
 };
 
-// Lancer le paiement
-const startPayment = () => {
+// Lancer le paiement via Paxity
+const startPayment = async () => {
     const phone = paymentPhone.value.trim();
 
     if (!phone) {
@@ -239,21 +282,71 @@ const startPayment = () => {
         return;
     }
 
+    if (!selectedMethodId.value) {
+        paymentError.value = 'Veuillez choisir un moyen de paiement';
+        return;
+    }
+
     phoneError.value = '';
+    paymentError.value = '';
+
+    const edition = selectedEditionForPurchase.value;
+    const amount = edition?.price || UNIT_PRICE;
 
     // Sauvegarder les données de l'achat en attente
     const pendingPurchase = {
-        edition: selectedEditionForPurchase.value,
+        edition,
         transactionId: paymentTransactionId.value,
-        amount: UNIT_PRICE,
-        phone: phone,
+        amount,
+        phone,
         timestamp: Date.now()
     };
     localStorage.setItem('pendingEditionPurchase', JSON.stringify(pendingPurchase));
 
-    // Lancer CinetPay
-    if (cinetpayRef.value) {
-        cinetpayRef.value.checkout(handlePaymentSuccess);
+    isPaying.value = true;
+
+    try {
+        const checkout = await createPaxityCheckout({
+            method: selectedMethodId.value,
+            amount,
+            phone,
+            reference: paymentTransactionId.value,
+            description: `ALT News - ${edition?.title || 'édition'}`
+        });
+
+        // La référence Paxity est la seule clé de rapprochement fiable :
+        // l'API ne renvoie pas notre propre référence à la relecture.
+        localStorage.setItem('paxityEditionReference', checkout.reference);
+
+        if (checkout.redirectUrl) {
+            // Méthodes QR_CODE : le client paie sur la page de l'opérateur.
+            // Ouvrir dans un onglet pour ne pas perdre l'état de la modale.
+            window.open(checkout.redirectUrl, '_blank', 'noopener');
+        }
+
+        awaitingValidation.value = true;
+        awaitingMessage.value = checkout.redirectUrl
+            ? 'Finalisez le paiement dans l\'onglet ouvert. Cette page se met à jour automatiquement.'
+            : 'Validez le paiement sur votre téléphone. Cette page se met à jour automatiquement.';
+
+        const final = await waitForPaxityCompletion(checkout.reference, {
+            onTick: () => { /* le statut reste PENDING tant que le client n'a pas validé */ }
+        });
+
+        if (final.status === 'SUCCESS') {
+            handlePaymentSuccess();
+        } else if (final.status === 'FAILED') {
+            paymentError.value = 'Le paiement a été refusé ou annulé.';
+        } else {
+            paymentError.value = 'Le paiement n\'a pas été confirmé à temps. Si vous avez été débité, contactez-nous avec la référence ' + checkout.reference + '.';
+        }
+    } catch (error) {
+        // Ne jamais relancer automatiquement : la transaction a pu être créée
+        // côté Paxity malgré l'erreur, et un second appel doublerait le débit.
+        paymentError.value = paxityError.value || 'Le paiement n\'a pas pu être initié. Réessayez dans un instant.';
+    } finally {
+        isPaying.value = false;
+        awaitingValidation.value = false;
     }
 };
 
@@ -560,6 +653,34 @@ const handlePaymentSuccess = () => {
                         <p v-if="phoneError" class="phone-error">{{ phoneError }}</p>
                     </div>
 
+                    <!-- Moyens de paiement Paxity -->
+                    <div class="method-picker">
+                        <label class="phone-label">
+                            <i class="fa-solid fa-wallet me-2"></i>Moyen de paiement
+                        </label>
+
+                        <p v-if="methodsLoading" class="method-hint">Chargement des moyens de paiement…</p>
+                        <p v-else-if="methodsError" class="phone-error">{{ methodsError }}</p>
+
+                        <div v-else class="method-grid">
+                            <button
+                                v-for="method in paymentMethods"
+                                :key="method.id"
+                                type="button"
+                                class="method-option"
+                                :class="{ selected: selectedMethodId === method.id }"
+                                @click="selectedMethodId = method.id"
+                            >
+                                <img v-if="method.logo" :src="method.logo" :alt="method.name" class="method-logo" />
+                                <span class="method-name">{{ method.name }}</span>
+                            </button>
+                        </div>
+
+                        <p v-if="selectedMethod?.instructions" class="method-hint">
+                            {{ selectedMethod.instructions }}
+                        </p>
+                    </div>
+
                     <div class="payment-summary">
                         <div class="summary-row">
                             <span>Prix de l'édition</span>
@@ -571,23 +692,23 @@ const handlePaymentSuccess = () => {
                         </div>
                     </div>
 
-                    <!-- Composant CinetPay caché -->
-                    <Cinetpay
-                        ref="cinetpayRef"
-                        :structure="'CS Conseil'"
-                        :userName="getAuthUser()?.firstName || ''"
-                        :phone="paymentPhone"
-                        :email="getAuthUser()?.email || ''"
-                        :amount="selectedEditionForPurchase?.price || UNIT_PRICE"
-                        :service="`Achat édition ALT News: ${selectedEditionForPurchase?.title || ''}`"
-                        :firstName="getAuthUser()?.firstName || ''"
-                        :lastName="getAuthUser()?.lastName || ''"
-                        :transactionId="paymentTransactionId"
-                    />
+                    <p v-if="paymentError" class="phone-error">{{ paymentError }}</p>
 
-                    <button @click="startPayment" class="btn-pay" :disabled="!isPhoneValid">
+                    <!-- Attente de validation : les méthodes PUSH ne redirigent nulle part,
+                         le client valide sur son téléphone et rien ne le ramène ici. -->
+                    <div v-if="awaitingValidation" class="awaiting-validation">
+                        <div class="spinner"><div class="spinner-inner"></div></div>
+                        <p>{{ awaitingMessage }}</p>
+                    </div>
+
+                    <button
+                        @click="startPayment"
+                        class="btn-pay"
+                        :disabled="!isPhoneValid || !selectedMethodId || isPaying"
+                    >
                         <i class="fa-solid fa-credit-card me-2"></i>
-                        Payer {{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA
+                        <template v-if="isPaying">Paiement en cours…</template>
+                        <template v-else>Payer {{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA</template>
                     </button>
                 </div>
             </div>
@@ -1173,6 +1294,76 @@ const handlePaymentSuccess = () => {
     font-size: 1.1rem;
     font-weight: 700;
     color: #1f2937;
+}
+
+.method-picker {
+    margin-bottom: 20px;
+}
+
+.method-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.method-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 8px;
+    background: #fff;
+    border: 2px solid #e6e8ec;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.method-option:hover {
+    border-color: #b9c0cc;
+}
+
+.method-option.selected {
+    border-color: #3761ff;
+    box-shadow: 0 0 0 3px rgba(55, 97, 255, 0.12);
+}
+
+.method-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.method-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e2937;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.method-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.awaiting-validation {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    margin-bottom: 16px;
+    background: #f4f7ff;
+    border: 1px solid #d6e0ff;
+    border-radius: 10px;
+}
+
+.awaiting-validation p {
+    margin: 0;
+    font-size: 14px;
+    color: #1e2937;
 }
 
 .btn-pay {
