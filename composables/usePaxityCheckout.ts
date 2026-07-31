@@ -1,0 +1,159 @@
+/**
+ * Paiement via Paxity.
+ *
+ * Reprend volontairement la forme de `useJekoCheckout` — `getMethods()`,
+ * `createCheckout()`, `getStatus()` — pour que la bascule d'un composant d'un
+ * fournisseur à l'autre reste une substitution, pas une réécriture.
+ *
+ * Différence de fond : aucune clé n'est manipulée ici. Tout passe par les
+ * routes `/api/payment/paxity/**` du serveur Nitro, qui détiennent seules les
+ * identifiants. Il n'y a donc ni CORS à contourner ni secret dans le bundle.
+ */
+
+export const PAXITY_CHECKOUT_REFERENCE_KEY = 'paxity_checkout_reference'
+export const PAXITY_CHECKOUT_DETAILS_KEY = 'paxity_checkout_details'
+export const PAXITY_PENDING_SUBSCRIPTION_KEY = 'paxity_pending_subscription'
+export const PAXITY_COMPLETED_REFERENCE_KEY = 'paxity_completed_reference'
+
+export type PaxityMethodType = 'PUSH' | 'QR_CODE' | 'OTP'
+export type PaxityPaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
+
+export interface PaxityPaymentMethod {
+  id: string
+  name: string
+  logo: string | null
+  type: PaxityMethodType
+  currency: string
+  country: string
+  phonePrefix: string | null
+  instructions: string | null
+}
+
+export interface PaxityCheckoutPayload {
+  method: string
+  amount: number
+  phone: string
+  reference?: string
+  description?: string
+  otp?: string
+}
+
+export interface PaxityCheckoutResponse {
+  reference: string
+  status: PaxityPaymentStatus
+  amount: number
+  netAmount: number | null
+  currency: string
+  methodType: PaxityMethodType
+  /** Page de paiement de l'opérateur — `null` pour les méthodes `PUSH`. */
+  redirectUrl: string | null
+  /** PNG en base64, sans préfixe `data:`. */
+  qrCode: string | null
+  createdAt: string | null
+}
+
+export interface PaxityStatusResponse {
+  reference: string
+  merchantReference: string | null
+  status: PaxityPaymentStatus
+  amount: number
+  currency: string
+  method: string | null
+}
+
+export const usePaxityCheckout = () => {
+  const loading = ref(false)
+  const error = ref('')
+
+  const call = async <T>(url: string, options: Parameters<typeof $fetch>[1] = {}) => {
+    error.value = ''
+    try {
+      return await $fetch<T>(url, options)
+    } catch (err: any) {
+      // Nitro place le message métier dans statusMessage.
+      error.value =
+        err?.data?.statusMessage ||
+        err?.statusMessage ||
+        err?.message ||
+        'Erreur lors de la communication avec le service de paiement'
+      throw err
+    }
+  }
+
+  /** Moyens de paiement actifs, éventuellement filtrés par pays. */
+  const getMethods = async (country?: string) => {
+    loading.value = true
+    try {
+      return await call<PaxityPaymentMethod[]>('/api/payment/paxity/methods', {
+        query: country ? { country } : {}
+      })
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Initie un encaissement.
+   *
+   * Ne jamais rejouer cet appel après un échec réseau : la transaction a pu
+   * être créée côté Paxity. Vérifier par `getStatus()` avant toute relance.
+   */
+  const createCheckout = async (payload: PaxityCheckoutPayload) => {
+    loading.value = true
+    try {
+      return await call<PaxityCheckoutResponse>('/api/payment/paxity/checkout', {
+        method: 'POST',
+        body: payload
+      })
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /** État réel de la transaction, lu auprès de Paxity. */
+  const getStatus = async (reference: string) => {
+    return call<PaxityStatusResponse>('/api/payment/paxity/status', {
+      query: { reference }
+    })
+  }
+
+  /**
+   * Interroge le statut jusqu'à ce qu'il soit définitif.
+   *
+   * Indispensable pour les méthodes `PUSH`, qui ne renvoient aucune URL : le
+   * payeur valide sur son téléphone et rien ne le ramène sur le site.
+   */
+  const waitForCompletion = async (
+    reference: string,
+    { intervalMs = 4000, timeoutMs = 300_000, onTick }: {
+      intervalMs?: number
+      timeoutMs?: number
+      onTick?: (status: PaxityStatusResponse) => void
+    } = {}
+  ): Promise<PaxityStatusResponse> => {
+    const deadline = Date.now() + timeoutMs
+    let last: PaxityStatusResponse | undefined
+
+    while (Date.now() < deadline) {
+      try {
+        last = await getStatus(reference)
+        onTick?.(last)
+        if (last.status !== 'PENDING') return last
+      } catch {
+        // Une lecture qui échoue ne conclut rien : on retente jusqu'au délai.
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs))
+    }
+
+    return last ?? { reference, merchantReference: null, status: 'PENDING', amount: 0, currency: '', method: null }
+  }
+
+  return {
+    loading: readonly(loading),
+    error: readonly(error),
+    getMethods,
+    createCheckout,
+    getStatus,
+    waitForCompletion
+  }
+}

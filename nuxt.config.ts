@@ -6,7 +6,17 @@ export default defineNuxtConfig({
   ssr: false,
 
   runtimeConfig: {
+    // ⚠️ Privé : jamais dans `public`, qui est inliné dans le bundle navigateur.
+    // Renseigné par PAXITY_API_KEY / PAXITY_API_TOKEN / … dans l'environnement.
+    // Seules les routes server/api/payment/paxity/** y ont accès.
+    paxityApiKey: process.env.PAXITY_API_KEY || '',
+    paxityApiToken: process.env.PAXITY_API_TOKEN || '',
+    paxityBearer: process.env.PAXITY_BEARER || '',
+    paxityBaseUrl: process.env.PAXITY_BASE_URL || '',
+    paxityWebhookSecret: process.env.PAXITY_WEBHOOK_SECRET || '',
+
     public: {
+      siteUrl: process.env.SITE_URL || 'https://conseil.coumbassa-sanden.com',
       apiBaseUrl: process.env.API_BASE_URL || 'https://nextapi.coumbassa-sanden.com',
       apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://nextapi.coumbassa-sanden.com/api/',
       // Vide = même origine : les appels passent par le proxy Nitro ci-dessous.
