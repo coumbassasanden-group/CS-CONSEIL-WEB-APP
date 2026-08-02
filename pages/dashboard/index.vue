@@ -321,7 +321,7 @@ const processEditionPayment = async () => {
         const final = await waitForPaxityCompletion(checkout.reference);
 
         if (final.status === 'SUCCESS') {
-            await handleEditionPaymentSuccess();
+            await handleEditionPaymentSuccess(checkout.reference);
         } else if (final.status === 'FAILED') {
             paymentError.value = 'Le paiement a été refusé ou annulé.';
         } else {
@@ -337,7 +337,14 @@ const processEditionPayment = async () => {
 };
 
 // Handle edition payment success
-const handleEditionPaymentSuccess = async () => {
+/**
+ * Enregistre l'achat côté serveur une fois le paiement confirmé.
+ *
+ * `paymentReference` est la référence **Paxity**, pas notre identifiant local :
+ * l'API ne renvoie jamais `idClient` en lecture, donc seule la référence du
+ * fournisseur permet de rapprocher l'achat de la transaction.
+ */
+const handleEditionPaymentSuccess = async (paymentReference) => {
     try {
         const res = await fetch(`${config.public.apiBaseUrl}/api/subscription/purchase-edition`, {
             method: 'POST',
@@ -348,8 +355,8 @@ const handleEditionPaymentSuccess = async () => {
             },
             body: JSON.stringify({
                 edition_id: selectedEdition.value.id,
-                payment_reference: transactionId.value,
-                payment_method: 'cinetpay'
+                payment_reference: paymentReference || transactionId.value,
+                payment_method: 'paxity'
             })
         });
         
@@ -743,7 +750,7 @@ useHead({
                                             </td>
                                             <td>{{ formatPrice(purchase.amount) }}</td>
                                             <td>
-                                                <span class="badge bg-secondary">{{ purchase.payment_method || 'CinetPay' }}</span>
+                                                <span class="badge bg-secondary">{{ purchase.payment_method || 'Paxity' }}</span>
                                             </td>
                                             <td>
                                                 <span class="badge" :class="purchase.status === 'completed' ? 'bg-success' : 'bg-warning'">

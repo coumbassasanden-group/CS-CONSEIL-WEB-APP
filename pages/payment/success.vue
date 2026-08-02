@@ -41,17 +41,27 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
-  JEKO_CHECKOUT_DETAILS_KEY,
-  JEKO_CHECKOUT_REFERENCE_KEY,
-  JEKO_COMPLETED_REFERENCE_KEY,
-  JEKO_COMPLETED_EDITION_REFERENCE_KEY,
-  JEKO_PENDING_EDITION_PURCHASE_KEY,
-  JEKO_PENDING_SUBSCRIPTION_KEY,
-  useJekoCheckout,
-  type JekoPaymentStatus
-} from '~/composables/useJekoCheckout'
+  PAXITY_CHECKOUT_DETAILS_KEY,
+  PAXITY_CHECKOUT_REFERENCE_KEY,
+  PAXITY_COMPLETED_REFERENCE_KEY,
+  PAXITY_COMPLETED_EDITION_REFERENCE_KEY,
+  PAXITY_PENDING_EDITION_PURCHASE_KEY,
+  PAXITY_PENDING_SUBSCRIPTION_KEY,
+  usePaxityCheckout
+} from '~/composables/usePaxityCheckout'
 import { useSubscription } from '~/composables/useSubscription'
 import { useAuth } from '~/composables/useAuth'
+
+/** Représentation interne du statut, indépendante du vocabulaire du fournisseur. */
+type PaymentStatusView = 'pending' | 'success' | 'error'
+
+/**
+ * Au-delà de ce délai, on cesse d'interroger l'API.
+ *
+ * Paxity ne renvoie jamais le client sur le site : sans borne, la page
+ * sonderait indéfiniment un paiement que personne ne validera.
+ */
+const POLL_TIMEOUT_MS = 10 * 60 * 1000
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -59,8 +69,8 @@ const { getAuthToken } = useAuth()
 
 const {
   getStatus,
-  error: jekoError
-} = useJekoCheckout()
+  error: paxityError
+} = usePaxityCheckout()
 
 const {
   createSubscription,
@@ -68,12 +78,14 @@ const {
 } = useSubscription()
 
 const reference = ref('')
-const paymentStatus = ref<JekoPaymentStatus>('pending')
+const paymentStatus = ref<PaymentStatusView>('pending')
 const statusLoading = ref(false)
 const finalizeLoading = ref(false)
 const finalizeError = ref('')
 const pendingEditionPurchase = ref<any>(null)
+const pollExpired = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollDeadline = 0
 
 const currentLocale = computed(() => {
   const pathParts = route.path.split('/')
@@ -81,7 +93,7 @@ const currentLocale = computed(() => {
   return ['fr', 'en'].includes(locale) ? locale : 'fr'
 })
 
-const apiError = computed(() => jekoError.value)
+const apiError = computed(() => paxityError.value)
 
 const statusClass = computed(() => ({
   pending: paymentStatus.value === 'pending',
@@ -107,13 +119,16 @@ const message = computed(() => {
       ? 'Paiement confirmé. Enregistrement de votre édition en cours...'
       : 'Paiement confirmé. Activation de votre abonnement en cours...'
   }
-  if (paymentStatus.value === 'success') return 'Votre paiement Jeko a été validé.'
+  if (paymentStatus.value === 'success') return 'Votre paiement a été validé.'
   if (paymentStatus.value === 'error') {
     return pendingEditionPurchase.value
       ? 'Le paiement n’a pas pu être validé. Vous pouvez réessayer depuis votre espace abonné.'
       : 'Le paiement n’a pas pu être validé. Vous pouvez réessayer depuis la page d’abonnement.'
   }
-  return 'Nous vérifions votre paiement. Cette page se met à jour automatiquement.'
+  if (pollExpired.value) {
+    return `Nous n’avons pas reçu de confirmation. Si vous avez été débité, contactez-nous en indiquant la référence ${reference.value}.`
+  }
+  return 'Validez le paiement sur votre téléphone ou dans l’onglet ouvert. Cette page se met à jour automatiquement.'
 })
 
 const stopPolling = () => {
@@ -124,25 +139,25 @@ const stopPolling = () => {
 }
 
 const restorePendingSubscription = () => {
-  const pending = localStorage.getItem(JEKO_PENDING_SUBSCRIPTION_KEY)
+  const pending = localStorage.getItem(PAXITY_PENDING_SUBSCRIPTION_KEY)
   if (!pending) return null
 
   try {
     return JSON.parse(pending)
   } catch (error) {
-    console.error('Erreur restauration abonnement Jeko:', error)
+    console.error('Erreur restauration abonnement:', error)
     return null
   }
 }
 
 const restorePendingEditionPurchase = () => {
-  const pending = localStorage.getItem(JEKO_PENDING_EDITION_PURCHASE_KEY)
+  const pending = localStorage.getItem(PAXITY_PENDING_EDITION_PURCHASE_KEY)
   if (!pending) return null
 
   try {
     return JSON.parse(pending)
   } catch (error) {
-    console.error('Erreur restauration achat d’édition Jeko:', error)
+    console.error('Erreur restauration achat d’édition:', error)
     return null
   }
 }
@@ -150,7 +165,7 @@ const restorePendingEditionPurchase = () => {
 const finalizeEditionPurchase = async () => {
   if (!reference.value || finalizeLoading.value || !pendingEditionPurchase.value) return
 
-  const completedReference = localStorage.getItem(JEKO_COMPLETED_EDITION_REFERENCE_KEY)
+  const completedReference = localStorage.getItem(PAXITY_COMPLETED_EDITION_REFERENCE_KEY)
   if (completedReference === reference.value) return
 
   finalizeLoading.value = true
@@ -178,7 +193,7 @@ const finalizeEditionPurchase = async () => {
       body: JSON.stringify({
         edition_id: edition.id,
         payment_reference: reference.value,
-        payment_method: 'jeko'
+        payment_method: 'paxity'
       })
     })
 
@@ -216,7 +231,7 @@ const finalizeEditionPurchase = async () => {
         amount: pending.amount,
         type: 'single',
         status: 'completed',
-        provider: 'jeko',
+        provider: 'paxity',
         paymentMethod: pending.paymentMethod,
         transactionId: pending.transactionId,
         paymentReference: reference.value,
@@ -225,10 +240,10 @@ const finalizeEditionPurchase = async () => {
       localStorage.setItem('paymentHistory', JSON.stringify(paymentHistory))
     }
 
-    localStorage.setItem(JEKO_COMPLETED_EDITION_REFERENCE_KEY, reference.value)
-    localStorage.removeItem(JEKO_PENDING_EDITION_PURCHASE_KEY)
-    localStorage.removeItem(JEKO_CHECKOUT_REFERENCE_KEY)
-    localStorage.removeItem(JEKO_CHECKOUT_DETAILS_KEY)
+    localStorage.setItem(PAXITY_COMPLETED_EDITION_REFERENCE_KEY, reference.value)
+    localStorage.removeItem(PAXITY_PENDING_EDITION_PURCHASE_KEY)
+    localStorage.removeItem(PAXITY_CHECKOUT_REFERENCE_KEY)
+    localStorage.removeItem(PAXITY_CHECKOUT_DETAILS_KEY)
     pendingEditionPurchase.value = null
   } catch (error: any) {
     finalizeError.value = error?.message || 'Erreur lors de l’enregistrement de votre achat'
@@ -240,7 +255,7 @@ const finalizeEditionPurchase = async () => {
 const finalizeSubscription = async () => {
   if (!reference.value || finalizeLoading.value) return
 
-  const completedReference = localStorage.getItem(JEKO_COMPLETED_REFERENCE_KEY)
+  const completedReference = localStorage.getItem(PAXITY_COMPLETED_REFERENCE_KEY)
   if (completedReference === reference.value) return
 
   const pendingSubscription = restorePendingSubscription()
@@ -257,10 +272,10 @@ const finalizeSubscription = async () => {
       throw new Error('Paiement confirmé, mais l’abonnement n’a pas pu être activé automatiquement.')
     }
 
-    localStorage.setItem(JEKO_COMPLETED_REFERENCE_KEY, reference.value)
-    localStorage.removeItem(JEKO_PENDING_SUBSCRIPTION_KEY)
-    localStorage.removeItem(JEKO_CHECKOUT_REFERENCE_KEY)
-    localStorage.removeItem(JEKO_CHECKOUT_DETAILS_KEY)
+    localStorage.setItem(PAXITY_COMPLETED_REFERENCE_KEY, reference.value)
+    localStorage.removeItem(PAXITY_PENDING_SUBSCRIPTION_KEY)
+    localStorage.removeItem(PAXITY_CHECKOUT_REFERENCE_KEY)
+    localStorage.removeItem(PAXITY_CHECKOUT_DETAILS_KEY)
     localStorage.removeItem('selectedPlan')
   } catch (error: any) {
     finalizeError.value = error?.message || 'Erreur lors de l’activation de votre abonnement'
@@ -275,17 +290,24 @@ const checkStatus = async () => {
     return
   }
 
+  if (pollDeadline && Date.now() > pollDeadline) {
+    stopPolling()
+    pollExpired.value = true
+    return
+  }
+
   statusLoading.value = true
 
   try {
-    const pendingSubscription = restorePendingSubscription()
-    const status = await getStatus(
-      reference.value,
-      pendingEditionPurchase.value?.userId || pendingSubscription?.userId
-    )
-    paymentStatus.value = status.status
+    const status = await getStatus(reference.value)
 
-    if (status.status === 'success') {
+    // Paxity répond PENDING / SUCCESS / FAILED ; la page raisonne en
+    // pending / success / error.
+    paymentStatus.value =
+      status.status === 'SUCCESS' ? 'success' :
+      status.status === 'FAILED' ? 'error' : 'pending'
+
+    if (paymentStatus.value === 'success') {
       stopPolling()
       if (pendingEditionPurchase.value) {
         await finalizeEditionPurchase()
@@ -294,11 +316,12 @@ const checkStatus = async () => {
       }
     }
 
-    if (status.status === 'error') {
+    if (paymentStatus.value === 'error') {
       stopPolling()
     }
   } catch (error) {
-    console.error('Erreur vérification statut Jeko:', error)
+    // Une lecture qui échoue ne conclut rien : le sondage suivant retentera.
+    console.error('Erreur vérification statut Paxity:', error)
   } finally {
     statusLoading.value = false
   }
@@ -306,8 +329,9 @@ const checkStatus = async () => {
 
 onMounted(async () => {
   pendingEditionPurchase.value = restorePendingEditionPurchase()
-  reference.value = String(route.query.reference || localStorage.getItem(JEKO_CHECKOUT_REFERENCE_KEY) || '')
+  reference.value = String(route.query.reference || localStorage.getItem(PAXITY_CHECKOUT_REFERENCE_KEY) || '')
 
+  pollDeadline = Date.now() + POLL_TIMEOUT_MS
   await checkStatus()
 
   if (paymentStatus.value === 'pending') {

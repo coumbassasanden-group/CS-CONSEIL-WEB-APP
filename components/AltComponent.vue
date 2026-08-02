@@ -4,6 +4,11 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '~/composables/useAuth';
 import LoginModal from '~/components/LoginModal.vue';
+import {
+    PAXITY_CHECKOUT_DETAILS_KEY,
+    PAXITY_CHECKOUT_REFERENCE_KEY,
+    PAXITY_PENDING_EDITION_PURCHASE_KEY
+} from '~/composables/usePaxityCheckout';
 
 const config = useRuntimeConfig();
 const { locale } = useI18n();
@@ -40,7 +45,6 @@ const UNIT_PRICE = 2000;
 const {
     createCheckout: createPaxityCheckout,
     getMethods: getPaxityMethods,
-    waitForCompletion: waitForPaxityCompletion,
     error: paxityError
 } = usePaxityCheckout();
 
@@ -50,8 +54,6 @@ const methodsLoading = ref(false);
 const methodsError = ref('');
 const paymentError = ref('');
 const isPaying = ref(false);
-const awaitingValidation = ref(false);
-const awaitingMessage = ref('');
 
 const selectedMethod = computed(
     () => paymentMethods.value.find((method) => method.id === selectedMethodId.value) || null
@@ -240,7 +242,6 @@ const closePaymentModal = () => {
     paymentPhone.value = '';
     phoneError.value = '';
     paymentError.value = '';
-    awaitingValidation.value = false;
 };
 
 // Callback après connexion réussie
@@ -292,16 +293,12 @@ const startPayment = async () => {
 
     const edition = selectedEditionForPurchase.value;
     const amount = edition?.price || UNIT_PRICE;
+    const user = getAuthUser();
 
-    // Sauvegarder les données de l'achat en attente
-    const pendingPurchase = {
-        edition,
-        transactionId: paymentTransactionId.value,
-        amount,
-        phone,
-        timestamp: Date.now()
-    };
-    localStorage.setItem('pendingEditionPurchase', JSON.stringify(pendingPurchase));
+    // Seules les méthodes QR_CODE renvoient une page opérateur ; les méthodes
+    // PUSH se valident sur le téléphone du client, sans redirection.
+    const expectsRedirect = selectedMethod.value?.type === 'QR_CODE';
+    const paymentWindow = expectsRedirect ? window.open('about:blank', '_blank') : null;
 
     isPaying.value = true;
 
@@ -316,94 +313,44 @@ const startPayment = async () => {
 
         // La référence Paxity est la seule clé de rapprochement fiable :
         // l'API ne renvoie pas notre propre référence à la relecture.
-        localStorage.setItem('paxityEditionReference', checkout.reference);
+        const pendingPurchase = {
+            edition,
+            transactionId: paymentTransactionId.value,
+            reference: checkout.reference,
+            userId: user?.id || user?.userId || user?.email,
+            amount,
+            phone,
+            paymentMethod: selectedMethodId.value,
+            provider: 'paxity',
+            timestamp: Date.now()
+        };
 
-        if (checkout.redirectUrl) {
-            // Méthodes QR_CODE : le client paie sur la page de l'opérateur.
-            // Ouvrir dans un onglet pour ne pas perdre l'état de la modale.
-            window.open(checkout.redirectUrl, '_blank', 'noopener');
+        localStorage.setItem(PAXITY_CHECKOUT_REFERENCE_KEY, checkout.reference);
+        localStorage.setItem(PAXITY_CHECKOUT_DETAILS_KEY, JSON.stringify(checkout));
+        localStorage.setItem(PAXITY_PENDING_EDITION_PURCHASE_KEY, JSON.stringify(pendingPurchase));
+
+        if (checkout.redirectUrl && paymentWindow) {
+            paymentWindow.location.href = checkout.redirectUrl;
+        } else if (checkout.redirectUrl) {
+            // Ouverture bloquée par le navigateur : on redirige l'onglet courant.
+            await navigateTo(checkout.redirectUrl, { external: true });
+            return;
         }
 
-        awaitingValidation.value = true;
-        awaitingMessage.value = checkout.redirectUrl
-            ? 'Finalisez le paiement dans l\'onglet ouvert. Cette page se met à jour automatiquement.'
-            : 'Validez le paiement sur votre téléphone. Cette page se met à jour automatiquement.';
-
-        const final = await waitForPaxityCompletion(checkout.reference, {
-            onTick: () => { /* le statut reste PENDING tant que le client n'a pas validé */ }
-        });
-
-        if (final.status === 'SUCCESS') {
-            handlePaymentSuccess();
-        } else if (final.status === 'FAILED') {
-            paymentError.value = 'Le paiement a été refusé ou annulé.';
-        } else {
-            paymentError.value = 'Le paiement n\'a pas été confirmé à temps. Si vous avez été débité, contactez-nous avec la référence ' + checkout.reference + '.';
-        }
+        // Paxity ne rappelle jamais le site après paiement : la page de suivi
+        // interroge le statut, puis enregistre l'achat côté serveur.
+        await navigateTo(
+            `/${currentLocale.value}/payment/success?reference=${encodeURIComponent(checkout.reference)}`
+        );
     } catch (error) {
         // Ne jamais relancer automatiquement : la transaction a pu être créée
         // côté Paxity malgré l'erreur, et un second appel doublerait le débit.
+        paymentWindow?.close();
         paymentError.value = paxityError.value || 'Le paiement n\'a pas pu être initié. Réessayez dans un instant.';
-    } finally {
         isPaying.value = false;
-        awaitingValidation.value = false;
     }
 };
 
-// Callback après paiement réussi
-const handlePaymentSuccess = () => {
-    const pendingData = localStorage.getItem('pendingEditionPurchase');
-    if (!pendingData) return;
-
-    try {
-        const pending = JSON.parse(pendingData);
-        const edition = pending.edition;
-
-        // Ajouter l'édition aux achats
-        let purchasedEditions = [];
-        const storedEditions = localStorage.getItem('purchasedEditions');
-        if (storedEditions) {
-            purchasedEditions = JSON.parse(storedEditions);
-        }
-
-        // Vérifier si déjà acheté
-        if (!purchasedEditions.some(e => e.id === edition.id)) {
-            purchasedEditions.push({
-                ...edition,
-                purchaseDate: new Date().toISOString(),
-                transactionId: pending.transactionId
-            });
-            localStorage.setItem('purchasedEditions', JSON.stringify(purchasedEditions));
-        }
-
-        // Ajouter à l'historique des paiements
-        let paymentHistory = [];
-        const storedPayments = localStorage.getItem('paymentHistory');
-        if (storedPayments) {
-            paymentHistory = JSON.parse(storedPayments);
-        }
-        paymentHistory.push({
-            id: paymentHistory.length + 1,
-            date: new Date().toISOString(),
-            description: `Achat édition: ${edition.title}`,
-            amount: pending.amount,
-            type: 'single',
-            status: 'completed',
-            transactionId: pending.transactionId
-        });
-        localStorage.setItem('paymentHistory', JSON.stringify(paymentHistory));
-
-        // Nettoyer
-        localStorage.removeItem('pendingEditionPurchase');
-        closePaymentModal();
-
-        // Rediriger vers l'espace abonné
-        router.push(`/${currentLocale.value}/subscriber/manage`);
-
-    } catch (e) {
-        console.error('Erreur lors de la confirmation de l\'achat:', e);
-    }
-};
 </script>
 
 <template>
@@ -693,13 +640,6 @@ const handlePaymentSuccess = () => {
                     </div>
 
                     <p v-if="paymentError" class="phone-error">{{ paymentError }}</p>
-
-                    <!-- Attente de validation : les méthodes PUSH ne redirigent nulle part,
-                         le client valide sur son téléphone et rien ne le ramène ici. -->
-                    <div v-if="awaitingValidation" class="awaiting-validation">
-                        <div class="spinner"><div class="spinner-inner"></div></div>
-                        <p>{{ awaitingMessage }}</p>
-                    </div>
 
                     <button
                         @click="startPayment"

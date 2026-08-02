@@ -338,42 +338,42 @@
       </div>
 
       <!-- Choix du moyen de paiement pour les abonnements payants -->
-      <div v-if="isPaidJekoPlan" class="payment-methods-section">
+      <div v-if="isPaidPlan" class="payment-methods-section">
         <div class="selection-header">
           <h3><Icon icon="mdi:credit-card-outline" width="24" height="24" /> Moyen de paiement</h3>
           <p class="selection-subtitle">Sélectionnez le moyen que vous souhaitez utiliser</p>
           <span class="required-badge">Obligatoire</span>
         </div>
 
-        <div v-if="jekoMethodsLoading" class="payment-methods-loading">
+        <div v-if="methodsLoading" class="payment-methods-loading">
           Chargement des moyens de paiement...
         </div>
 
-        <div v-else-if="jekoMethodsError" class="alert alert-error">
-          {{ jekoMethodsError }}
-          <button type="button" class="btn btn-secondary mt-3" @click="loadJekoPaymentMethods">
+        <div v-else-if="methodsError" class="alert alert-error">
+          {{ methodsError }}
+          <button type="button" class="btn btn-secondary mt-3" @click="loadPaymentMethods">
             Réessayer
           </button>
         </div>
 
         <div v-else class="payment-methods-grid">
           <label
-            v-for="method in jekoPaymentMethods"
-            :key="getJekoPaymentMethodValue(method)"
+            v-for="method in paymentMethods"
+            :key="getPaymentMethodValue(method)"
             class="payment-method-card"
-            :class="{ selected: esjekoPaymentMethod === getJekoPaymentMethodValue(method) }"
+            :class="{ selected: selectedPaymentMethod === getPaymentMethodValue(method) }"
           >
             <input
-              v-model="esjekoPaymentMethod"
+              v-model="selectedPaymentMethod"
               type="radio"
-              name="jeko-payment-method"
-              :value="getJekoPaymentMethodValue(method)"
-              :disabled="!getJekoPaymentMethodValue(method) || isProcessing || isPaying"
+              name="payment-method"
+              :value="getPaymentMethodValue(method)"
+              :disabled="!getPaymentMethodValue(method) || isProcessing || isPaying"
             />
             <span class="method-logo">
               <img
                 v-if="method.logo"
-                :src="getJekoPaymentMethodLogo(method.logo)"
+                :src="method.logo"
                 :alt="method.name || method.code || 'Moyen de paiement'"
               />
               <Icon v-else icon="mdi:wallet-outline" width="26" height="26" />
@@ -383,7 +383,7 @@
         </div>
 
         <div
-          v-if="!jekoMethodsLoading && !jekoMethodsError && !jekoPaymentMethods.length"
+          v-if="!methodsLoading && !methodsError && !paymentMethods.length"
           class="alert alert-warning mt-3"
         >
           Aucun moyen de paiement n'est disponible pour le moment.
@@ -432,7 +432,7 @@
       <div class="button-group mt-4">
         <button
           @click="handleCreateSubscription"
-          :disabled="isProcessing || isPaying || (isStudentPlan && !studentProofFile) || (isPaidJekoPlan && !esjekoPaymentMethod)"
+          :disabled="isProcessing || isPaying || (isStudentPlan && !studentProofFile) || (isPaidPlan && !selectedPaymentMethod)"
           class="btn btn-primary btn-lg"
         >
           <span v-if="isProcessing">Création de l'abonnement...</span>
@@ -513,29 +513,27 @@ import { useRouter } from 'vue-router'
 import { useSubscription } from '~/composables/useSubscription'
 import { useAuth } from '~/composables/useAuth'
 import {
-  JEKO_CHECKOUT_DETAILS_KEY,
-  JEKO_CHECKOUT_REFERENCE_KEY,
-  JEKO_PENDING_SUBSCRIPTION_KEY,
-  type JekoPaymentMethod,
-  useJekoCheckout
-} from '~/composables/useJekoCheckout'
+  PAXITY_CHECKOUT_DETAILS_KEY,
+  PAXITY_CHECKOUT_REFERENCE_KEY,
+  PAXITY_PENDING_SUBSCRIPTION_KEY,
+  type PaxityPaymentMethod,
+  usePaxityCheckout
+} from '~/composables/usePaxityCheckout'
 import {Icon} from "@iconify/vue"
 
 const router = useRouter()
 const config = useRuntimeConfig()
-const CS_JEKO_PROD = Number(config.public.CS_JEKO_PROD ?? 1)
 const { isLoggedIn, getAuthUser } = useAuth()
 const {
-  createCheckout: createJekoCheckout,
-  error: jekoCheckoutError,
-  getMethods: getJekoPaymentMethods,
-  logoUrl: getJekoPaymentMethodLogo
-} = useJekoCheckout()
+  createCheckout: createPaxityCheckout,
+  error: paxityCheckoutError,
+  getMethods: getPaxityMethods
+} = usePaxityCheckout()
 const isPaying = ref(false)
-const jekoMethodsLoading = ref(false)
-const jekoMethodsError = ref('')
-const jekoPaymentMethods = ref<JekoPaymentMethod[]>([])
-const esjekoPaymentMethod = ref('')
+const methodsLoading = ref(false)
+const methodsError = ref('')
+const paymentMethods = ref<PaxityPaymentMethod[]>([])
+const selectedPaymentMethod = ref('')
 
 // Emits pour communiquer avec le parent
 const emit = defineEmits<{
@@ -622,49 +620,43 @@ const selectedPlanPrice = computed(() => {
   return Number(selectedPlanDetails.value?.price ?? getSelectedPlan.value?.price ?? 0)
 })
 
-const jekoBusiness = computed(() => {
-  return String(config.public.CS_JEKO_BUSINESS || '')
-})
-
-const jekoReturnUrl = computed(() => {
-  return String(config.public.CS_JEKO_RETURN_URL || '')
-})
-
-const isPaidJekoPlan = computed(() => {
+const isPaidPlan = computed(() => {
   return shouldShowRecap.value && subscriptionForm.value.planId !== freePlan.value && selectedPlanPrice.value > 0
 })
 
-const getJekoPaymentMethodValue = (method: JekoPaymentMethod) => {
-  return String(method.code || method.id || '')
-}
+const getPaymentMethodValue = (method: PaxityPaymentMethod) => String(method.id || '')
 
-const loadJekoPaymentMethods = async () => {
-  if (jekoMethodsLoading.value) return
+const selectedMethodDetails = computed(
+  () => paymentMethods.value.find(method => method.id === selectedPaymentMethod.value) || null
+)
 
-  jekoMethodsLoading.value = true
-  jekoMethodsError.value = ''
+const loadPaymentMethods = async () => {
+  if (methodsLoading.value) return
+
+  methodsLoading.value = true
+  methodsError.value = ''
 
   try {
-    jekoPaymentMethods.value = await getJekoPaymentMethods()
+    paymentMethods.value = await getPaxityMethods('CI')
 
-    const selectedMethodStillExists = jekoPaymentMethods.value.some(
-      method => getJekoPaymentMethodValue(method) === esjekoPaymentMethod.value
+    const selectedMethodStillExists = paymentMethods.value.some(
+      method => getPaymentMethodValue(method) === selectedPaymentMethod.value
     )
     if (!selectedMethodStillExists) {
-      esjekoPaymentMethod.value = ''
+      selectedPaymentMethod.value = paymentMethods.value[0]?.id || ''
     }
   } catch (error: any) {
-    jekoPaymentMethods.value = []
-    esjekoPaymentMethod.value = ''
-    jekoMethodsError.value = error?.message || 'Impossible de charger les moyens de paiement'
+    paymentMethods.value = []
+    selectedPaymentMethod.value = ''
+    methodsError.value = error?.message || 'Impossible de charger les moyens de paiement'
   } finally {
-    jekoMethodsLoading.value = false
+    methodsLoading.value = false
   }
 }
 
-watch(isPaidJekoPlan, (isPaidPlan) => {
-  if (isPaidPlan && !jekoPaymentMethods.value.length) {
-    loadJekoPaymentMethods()
+watch(isPaidPlan, (isPaidPlan) => {
+  if (isPaidPlan && !paymentMethods.value.length) {
+    loadPaymentMethods()
   }
 }, { immediate: true })
 
@@ -1016,7 +1008,7 @@ const completeSubscription = async () => {
 }
 
 /**
- * Étape 4: Déclencher le paiement Jeko
+ * Étape 4: Déclencher le paiement
  */
 const getSerializableSubscriptionData = () => {
   const {
@@ -1036,96 +1028,71 @@ const getCurrentLocale = () => {
   return ['fr', 'en'].includes(pathParts[1]) ? pathParts[1] : 'fr'
 }
 
-const normalizeJekoUserId = (userId: string | null) => {
-  if (!userId) return subscriptionForm.value.email
-  const numericUserId = Number(userId)
-  return Number.isFinite(numericUserId) && String(numericUserId) === String(userId)
-    ? numericUserId
-    : userId
-}
-
-const payWithJeko = async (amount: number) => {
+const payWithPaxity = async (amount: number) => {
   if (!subscriptionForm.value.userId || !subscriptionForm.value.email || !subscriptionForm.value.phone) {
     console.error('❌ Données d\'abonnement incomplètes')
     alert('Veuillez remplir tous les champs requis')
     return
   }
 
-  if (!esjekoPaymentMethod.value) {
+  if (!selectedPaymentMethod.value) {
     errorMessage.value = 'Veuillez sélectionner un moyen de paiement'
     return
   }
 
-  if (!jekoBusiness.value) {
-    errorMessage.value = 'Configuration Jeko incomplète: CS_JEKO_BUSINESS est manquant'
-    return
-  }
-
-  if (!jekoReturnUrl.value) {
-    errorMessage.value = 'Configuration Jeko incomplète: CS_JEKO_RETURN_URL est manquant'
-    return
-  }
-
-  const paymentWindow = window.open('about:blank', '_blank')
+  // Seules les méthodes QR_CODE renvoient une page opérateur ; les méthodes
+  // PUSH se valident sur le téléphone du client, sans redirection.
+  const expectsRedirect = selectedMethodDetails.value?.type === 'QR_CODE'
+  const paymentWindow = expectsRedirect ? window.open('about:blank', '_blank') : null
 
   isPaying.value = true
   errorMessage.value = ''
 
   try {
     const locale = getCurrentLocale()
-    const returnUrl = `${window.location.origin}/${locale}/payment/success`
-    const selectedPlan = selectedPlanDetails.value || getSelectedPlan.value
     const pendingSubscription = getSerializableSubscriptionData()
 
-    const checkout = await createJekoCheckout({
-      userId: normalizeJekoUserId(subscriptionForm.value.userId),
-      business: jekoBusiness.value,
-      amount: amount * CS_JEKO_PROD,
-      currency: 'XOF',
-      paymentMethod: esjekoPaymentMethod.value,
-      // return_url: jekoReturnUrl.value,
-      metadata: {
-        source: 'nuxt',
-        planId: subscriptionForm.value.planId,
-        email: subscriptionForm.value.email,
-        phone: subscriptionForm.value.phone,
-        transactionId,
-        frontendReturnUrl: `${returnUrl}?reference={reference}`
-      }
+    const checkout = await createPaxityCheckout({
+      method: selectedPaymentMethod.value,
+      amount,
+      phone: subscriptionForm.value.phone,
+      reference: transactionId,
+      description: `Abonnement ALT News - ${subscriptionForm.value.planId}`
     })
 
-    localStorage.setItem(JEKO_CHECKOUT_REFERENCE_KEY, checkout.reference)
-    localStorage.setItem(JEKO_CHECKOUT_DETAILS_KEY, JSON.stringify(checkout))
-    localStorage.setItem(JEKO_PENDING_SUBSCRIPTION_KEY, JSON.stringify(pendingSubscription))
+    localStorage.setItem(PAXITY_CHECKOUT_REFERENCE_KEY, checkout.reference)
+    localStorage.setItem(PAXITY_CHECKOUT_DETAILS_KEY, JSON.stringify(checkout))
+    localStorage.setItem(PAXITY_PENDING_SUBSCRIPTION_KEY, JSON.stringify(pendingSubscription))
 
-    console.log('✅ Checkout Jeko créé:', {
-      reference: checkout.reference,
-      paymentRequestId: checkout.paymentRequestId,
-      plan: selectedPlan?.name
-    })
-
-    if (paymentWindow) {
+    if (checkout.redirectUrl && paymentWindow) {
       paymentWindow.location.href = checkout.redirectUrl
-    } else {
+    } else if (checkout.redirectUrl) {
+      // Ouverture bloquée par le navigateur : on redirige l'onglet courant.
       await navigateTo(checkout.redirectUrl, { external: true })
+      return
     }
+
+    // Paxity ne rappelle jamais le site après paiement : la page de suivi
+    // interroge le statut jusqu'à résolution, puis active l'abonnement.
+    await navigateTo(
+      `/${locale}/payment/success?reference=${encodeURIComponent(checkout.reference)}`
+    )
   } catch (error: any) {
     paymentWindow?.close()
-    console.error('❌ Erreur checkout Jeko:', error)
-    errorMessage.value = jekoCheckoutError.value || error?.message || 'Erreur lors de la création du paiement'
+    console.error('❌ Erreur checkout Paxity:', error)
+    errorMessage.value = paxityCheckoutError.value || error?.message || 'Erreur lors de la création du paiement'
     isPaying.value = false
   }
 }
 
 const handleCreateSubscription = async () => {
-  // Plans gratuits (free ou prix=0 comme student_iua) → pas de paiement Jeko
+  // Plans gratuits (free ou prix=0 comme student_iua) → pas de paiement
   const planPrice = selectedPlanPrice.value
   if (subscriptionForm.value.planId === freePlan.value || planPrice === 0) {
     return completeSubscription()
   }
 
-  console.log('💳 Déclenchement du paiement Jeko...')
-  await payWithJeko(planPrice)
+  await payWithPaxity(planPrice)
 }
 
 /**

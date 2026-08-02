@@ -19,24 +19,8 @@ export default defineNuxtConfig({
       siteUrl: process.env.SITE_URL || 'https://conseil.coumbassa-sanden.com',
       apiBaseUrl: process.env.API_BASE_URL || 'https://nextapi.coumbassa-sanden.com',
       apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://nextapi.coumbassa-sanden.com/api/',
-      // Vide = même origine : les appels passent par le proxy Nitro ci-dessous.
-      // cs-pay ne renvoie Access-Control-Allow-Origin que pour http://localhost:3000,
-      // donc un appel direct depuis conseil.coumbassa-sanden.com est bloqué par le
-      // navigateur (vérifié le 2026-07-28). Remettre l'URL directe le jour où cs-pay
-      // autorisera ce domaine en CORS.
-      checkoutApiBase: process.env.CHECKOUT_API_BASE || '',
-      CS_JEKO_BUSINESS:'dd76c26d-0131-40b3-9e68-c493731652a3',
-      CS_JEKO_RETURN_URL: 'https://conseil.coumbassa-sanden.com/fr/subscriber/manage',
-      CS_JEKO_PROD: 100 ,
-      CS_JEKO_PAYMENT_METHOD: process.env.CS_JEKO_PAYMENT_METHOD || 'wave',
     }
     //http://213.199.36.68:5020
-  },
-
-  // Proxy same-origin vers l'API de paiement Jeko (voir checkoutApiBase ci-dessus).
-  routeRules: {
-    '/api/payment-providers/**': { proxy: 'https://cs-pay.coumbassa-sanden.com/api/payment-providers/**' },
-    '/uploads/payment-methods/**': { proxy: 'https://cs-pay.coumbassa-sanden.com/uploads/payment-methods/**' },
   },
 
   css: [

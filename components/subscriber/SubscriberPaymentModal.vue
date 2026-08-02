@@ -49,7 +49,7 @@
         <div class="payment-methods">
           <div class="payment-methods-header">
             <span>Moyen de paiement</span>
-            <small>Propulsé par Jeko</small>
+            <small>Paiement sécurisé</small>
           </div>
 
           <div v-if="methodsLoading" class="payment-state">
@@ -74,19 +74,19 @@
               <input
                 v-model="selectedPaymentMethod"
                 type="radio"
-                name="edition-jeko-payment-method"
+                name="edition-payment-method"
                 :value="getPaymentMethodValue(method)"
                 :disabled="isPaying || !getPaymentMethodValue(method)"
               />
               <span class="method-logo">
                 <img
                   v-if="method.logo"
-                  :src="getPaymentMethodLogo(method.logo)"
-                  :alt="method.name || method.code || 'Moyen de paiement'"
+                  :src="method.logo"
+                  :alt="method.name"
                 />
                 <Icon v-else icon="mdi:wallet-outline" />
               </span>
-              <span>{{ method.name || method.code || method.id }}</span>
+              <span>{{ method.name }}</span>
             </label>
           </div>
 
@@ -104,7 +104,7 @@
           @click="handlePay"
         >
           <Icon :icon="isPaying ? 'mdi:loading' : 'mdi:credit-card'" :class="{ spin: isPaying }" />
-          {{ isPaying ? 'Redirection vers Jeko...' : `Payer ${formatPrice(unitPrice)}` }}
+          {{ isPaying ? 'Paiement en cours...' : `Payer ${formatPrice(unitPrice)}` }}
         </button>
       </div>
     </div>
@@ -115,12 +115,12 @@
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
-  JEKO_CHECKOUT_DETAILS_KEY,
-  JEKO_CHECKOUT_REFERENCE_KEY,
-  JEKO_PENDING_EDITION_PURCHASE_KEY,
-  type JekoPaymentMethod,
-  useJekoCheckout
-} from '~/composables/useJekoCheckout'
+  PAXITY_CHECKOUT_DETAILS_KEY,
+  PAXITY_CHECKOUT_REFERENCE_KEY,
+  PAXITY_PENDING_EDITION_PURCHASE_KEY,
+  type PaxityPaymentMethod,
+  usePaxityCheckout
+} from '~/composables/usePaxityCheckout'
 import { useAuth } from '~/composables/useAuth'
 
 interface Edition {
@@ -142,15 +142,13 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const config = useRuntimeConfig()
 const route = useRoute()
 const { getAuthUser } = useAuth()
 const {
   createCheckout,
-  error: jekoError,
-  getMethods,
-  logoUrl: getPaymentMethodLogo
-} = useJekoCheckout()
+  error: paxityError,
+  getMethods
+} = usePaxityCheckout()
 
 // Phone state
 const phoneNumber = ref(props.initialPhone || '')
@@ -158,21 +156,20 @@ const phoneError = ref('')
 const checkoutError = ref('')
 const methodsLoading = ref(false)
 const methodsError = ref('')
-const paymentMethods = ref<JekoPaymentMethod[]>([])
+const paymentMethods = ref<PaxityPaymentMethod[]>([])
 const selectedPaymentMethod = ref('')
 const isPaying = ref(false)
-
-const amountMultiplier = computed(() => Number(config.public.CS_JEKO_PROD ?? 1))
-const jekoBusiness = computed(() => String(config.public.CS_JEKO_BUSINESS || ''))
 
 const currentLocale = computed(() => {
   const locale = route.path.split('/')[1]
   return ['fr', 'en'].includes(locale) ? locale : 'fr'
 })
 
-const getPaymentMethodValue = (method: JekoPaymentMethod) => {
-  return String(method.code || method.id || '')
-}
+const getPaymentMethodValue = (method: PaxityPaymentMethod) => String(method.id || '')
+
+const selectedMethodDetails = computed(
+  () => paymentMethods.value.find(method => method.id === selectedPaymentMethod.value) || null
+)
 
 const loadPaymentMethods = async () => {
   if (methodsLoading.value) return
@@ -181,12 +178,12 @@ const loadPaymentMethods = async () => {
   methodsError.value = ''
 
   try {
-    paymentMethods.value = await getMethods()
+    paymentMethods.value = await getMethods('CI')
     const selectionExists = paymentMethods.value.some(
       method => getPaymentMethodValue(method) === selectedPaymentMethod.value
     )
     if (!selectionExists) {
-      selectedPaymentMethod.value = ''
+      selectedPaymentMethod.value = paymentMethods.value[0]?.id || ''
     }
   } catch (error: any) {
     paymentMethods.value = []
@@ -249,11 +246,6 @@ const handlePay = async () => {
     return
   }
 
-  if (!jekoBusiness.value) {
-    checkoutError.value = 'Configuration Jeko incomplète'
-    return
-  }
-
   const user = getAuthUser()
   const userId = user?.id || user?.userId || user?.subscriber_id || user?.email
   if (!userId) {
@@ -261,28 +253,22 @@ const handlePay = async () => {
     return
   }
 
-  const paymentWindow = window.open('about:blank', '_blank')
+  // Les méthodes QR_CODE renvoient une page opérateur, les méthodes PUSH non :
+  // le client valide alors directement sur son téléphone. L'onglet n'est donc
+  // ouvert que si une redirection est réellement attendue.
+  const expectsRedirect = selectedMethodDetails.value?.type === 'QR_CODE'
+  const paymentWindow = expectsRedirect ? window.open('about:blank', '_blank') : null
+
   isPaying.value = true
 
   try {
-    const returnUrl = `${window.location.origin}/${currentLocale.value}/payment/success`
     const transactionId = `ED-${props.edition.id}-${Date.now()}`
     const checkout = await createCheckout({
-      userId,
-      business: jekoBusiness.value,
-      amount: props.unitPrice * amountMultiplier.value,
-      currency: 'XOF',
-      paymentMethod: selectedPaymentMethod.value,
-      return_url: returnUrl,
-      metadata: {
-        source: 'nuxt',
-        purchaseType: 'edition',
-        editionId: props.edition.id,
-        email: user?.email,
-        phone,
-        transactionId,
-        frontendReturnUrl: `${returnUrl}?reference={reference}`
-      }
+      method: selectedPaymentMethod.value,
+      amount: props.unitPrice,
+      phone,
+      reference: transactionId,
+      description: `ALT News - ${props.edition.title}`
     })
 
     const pendingPurchase = {
@@ -293,22 +279,30 @@ const handlePay = async () => {
       amount: props.unitPrice,
       phone,
       paymentMethod: selectedPaymentMethod.value,
-      provider: 'jeko',
+      provider: 'paxity',
       timestamp: Date.now()
     }
 
-    localStorage.setItem(JEKO_CHECKOUT_REFERENCE_KEY, checkout.reference)
-    localStorage.setItem(JEKO_CHECKOUT_DETAILS_KEY, JSON.stringify(checkout))
-    localStorage.setItem(JEKO_PENDING_EDITION_PURCHASE_KEY, JSON.stringify(pendingPurchase))
+    localStorage.setItem(PAXITY_CHECKOUT_REFERENCE_KEY, checkout.reference)
+    localStorage.setItem(PAXITY_CHECKOUT_DETAILS_KEY, JSON.stringify(checkout))
+    localStorage.setItem(PAXITY_PENDING_EDITION_PURCHASE_KEY, JSON.stringify(pendingPurchase))
 
-    if (paymentWindow) {
+    if (checkout.redirectUrl && paymentWindow) {
       paymentWindow.location.href = checkout.redirectUrl
-    } else {
+    } else if (checkout.redirectUrl) {
+      // Le navigateur a bloqué l'ouverture : on redirige l'onglet courant.
       await navigateTo(checkout.redirectUrl, { external: true })
+      return
     }
+
+    // Paxity ne rappelle jamais le site après paiement : c'est la page de
+    // suivi qui interroge le statut jusqu'à résolution.
+    await navigateTo(
+      `/${currentLocale.value}/payment/success?reference=${encodeURIComponent(checkout.reference)}`
+    )
   } catch (error: any) {
     paymentWindow?.close()
-    checkoutError.value = jekoError.value || error?.message || 'Impossible de démarrer le paiement Jeko'
+    checkoutError.value = paxityError.value || error?.message || 'Impossible de démarrer le paiement'
     isPaying.value = false
   }
 }

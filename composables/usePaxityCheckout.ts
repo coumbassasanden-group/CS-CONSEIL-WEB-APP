@@ -1,11 +1,7 @@
 /**
  * Paiement via Paxity.
  *
- * Reprend volontairement la forme de `useJekoCheckout` — `getMethods()`,
- * `createCheckout()`, `getStatus()` — pour que la bascule d'un composant d'un
- * fournisseur à l'autre reste une substitution, pas une réécriture.
- *
- * Différence de fond : aucune clé n'est manipulée ici. Tout passe par les
+ * Aucune clé n'est manipulée ici. Tout passe par les
  * routes `/api/payment/paxity/**` du serveur Nitro, qui détiennent seules les
  * identifiants. Il n'y a donc ni CORS à contourner ni secret dans le bundle.
  */
@@ -14,6 +10,8 @@ export const PAXITY_CHECKOUT_REFERENCE_KEY = 'paxity_checkout_reference'
 export const PAXITY_CHECKOUT_DETAILS_KEY = 'paxity_checkout_details'
 export const PAXITY_PENDING_SUBSCRIPTION_KEY = 'paxity_pending_subscription'
 export const PAXITY_COMPLETED_REFERENCE_KEY = 'paxity_completed_reference'
+export const PAXITY_PENDING_EDITION_PURCHASE_KEY = 'paxity_pending_edition_purchase'
+export const PAXITY_COMPLETED_EDITION_REFERENCE_KEY = 'paxity_completed_edition_reference'
 
 export type PaxityMethodType = 'PUSH' | 'QR_CODE' | 'OTP'
 export type PaxityPaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
