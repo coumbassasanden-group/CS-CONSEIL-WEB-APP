@@ -7,7 +7,8 @@ import LoginModal from '~/components/LoginModal.vue';
 import {
     PAXITY_CHECKOUT_DETAILS_KEY,
     PAXITY_CHECKOUT_REFERENCE_KEY,
-    PAXITY_PENDING_EDITION_PURCHASE_KEY
+    PAXITY_PENDING_EDITION_PURCHASE_KEY,
+    PAXITY_CARD_METHOD_ID
 } from '~/composables/usePaxityCheckout';
 
 const config = useRuntimeConfig();
@@ -44,12 +45,44 @@ const UNIT_PRICE = 2000;
 // tout passe par les routes /api/payment/paxity/** du serveur Nitro.
 const {
     createCheckout: createPaxityCheckout,
+    createCardCheckout: createPaxityCardCheckout,
     getMethods: getPaxityMethods,
     error: paxityError
 } = usePaxityCheckout();
 
 const paymentMethods = ref([]);
 const selectedMethodId = ref('');
+
+// —————————————————————————— Carte bancaire
+// Fermée tant que Paxity n'a pas habilité le business : son endpoint
+// `pay-in-card` répond 403. Le drapeau évite d'afficher une option morte.
+const cardEnabled = computed(() => String(config.public.paxityCardEnabled) === 'true');
+const isCardSelected = computed(() => selectedMethodId.value === PAXITY_CARD_METHOD_ID);
+
+/**
+ * ⚠️ Données de porteur : jamais persistées, jamais journalisées. Effacées
+ * dès la réponse du serveur et à la fermeture de la modale.
+ */
+const cardFields = ref({
+    cardNumber: '',
+    expiry: '',
+    cvv: '',
+    holderFirstName: '',
+    holderLastName: ''
+});
+
+const resetCardFields = () => {
+    cardFields.value = { cardNumber: '', expiry: '', cvv: '', holderFirstName: '', holderLastName: '' };
+};
+
+const isCardValid = computed(() => {
+    const f = cardFields.value;
+    return f.cardNumber.replace(/\D/g, '').length >= 12 &&
+        /^\d{2}\/\d{2}$/.test(f.expiry) &&
+        f.cvv.length >= 3 &&
+        f.holderFirstName.trim() !== '' &&
+        f.holderLastName.trim() !== '';
+});
 const methodsLoading = ref(false);
 const methodsError = ref('');
 const paymentError = ref('');
@@ -65,7 +98,22 @@ const loadPaymentMethods = async () => {
     methodsLoading.value = true;
     methodsError.value = '';
     try {
-        paymentMethods.value = await getPaxityMethods('CI');
+        const methods = await getPaxityMethods('CI');
+
+        // La carte ne figure pas au catalogue Paxity : on l'ajoute nous-mêmes.
+        paymentMethods.value = cardEnabled.value
+            ? [...methods, {
+                id: PAXITY_CARD_METHOD_ID,
+                name: 'Carte bancaire',
+                logo: null,
+                type: 'CARD',
+                currency: 'XOF',
+                country: 'CI',
+                phonePrefix: null,
+                instructions: 'Visa ou Mastercard'
+            }]
+            : methods;
+
         if (!selectedMethodId.value && paymentMethods.value.length) {
             selectedMethodId.value = paymentMethods.value[0].id;
         }
@@ -273,18 +321,23 @@ const onRegisterClick = () => {
 const startPayment = async () => {
     const phone = paymentPhone.value.trim();
 
-    if (!phone) {
-        phoneError.value = 'Veuillez entrer votre numéro de téléphone';
-        return;
-    }
-
-    if (phone.length < 8) {
-        phoneError.value = 'Le numéro doit contenir au moins 8 chiffres';
-        return;
-    }
-
     if (!selectedMethodId.value) {
         paymentError.value = 'Veuillez choisir un moyen de paiement';
+        return;
+    }
+
+    // La carte n'a pas besoin du téléphone ; les moyens mobiles si.
+    if (!isCardSelected.value) {
+        if (!phone) {
+            phoneError.value = 'Veuillez entrer votre numéro de téléphone';
+            return;
+        }
+        if (phone.length < 8) {
+            phoneError.value = 'Le numéro doit contenir au moins 8 chiffres';
+            return;
+        }
+    } else if (!isCardValid.value) {
+        paymentError.value = 'Veuillez compléter les informations de votre carte.';
         return;
     }
 
@@ -303,13 +356,36 @@ const startPayment = async () => {
     isPaying.value = true;
 
     try {
-        const checkout = await createPaxityCheckout({
-            method: selectedMethodId.value,
-            amount,
-            phone,
-            reference: paymentTransactionId.value,
-            description: `ALT News - ${edition?.title || 'édition'}`
-        });
+        let checkout;
+
+        if (isCardSelected.value) {
+            const [expiryMonth, expiryYear] = cardFields.value.expiry.split('/');
+            try {
+                checkout = await createPaxityCardCheckout({
+                    amount,
+                    cardNumber: cardFields.value.cardNumber,
+                    expiryMonth,
+                    expiryYear,
+                    cvv: cardFields.value.cvv,
+                    holderFirstName: cardFields.value.holderFirstName,
+                    holderLastName: cardFields.value.holderLastName,
+                    reference: paymentTransactionId.value,
+                    description: `ALT News - ${edition?.title || 'édition'}`
+                });
+            } finally {
+                // Les données de carte disparaissent dès l'appel terminé,
+                // succès comme échec.
+                resetCardFields();
+            }
+        } else {
+            checkout = await createPaxityCheckout({
+                method: selectedMethodId.value,
+                amount,
+                phone,
+                reference: paymentTransactionId.value,
+                description: `ALT News - ${edition?.title || 'édition'}`
+            });
+        }
 
         // La référence Paxity est la seule clé de rapprochement fiable :
         // l'API ne renvoie pas notre propre référence à la relecture.
@@ -584,8 +660,8 @@ const startPayment = async () => {
                         </div>
                     </div>
 
-                    <!-- Champ téléphone -->
-                    <div class="phone-input-wrapper">
+                    <!-- Champ téléphone : inutile pour un paiement par carte -->
+                    <div v-if="!isCardSelected" class="phone-input-wrapper">
                         <label for="phone" class="phone-label">
                             <i class="fa-solid fa-phone me-2"></i>Numéro de téléphone
                         </label>
@@ -628,6 +704,14 @@ const startPayment = async () => {
                         </p>
                     </div>
 
+                    <!-- Formulaire carte : monté sous v-if pour que Vue détruise
+                         l'état — et donc les données de carte — à la fermeture. -->
+                    <PaymentCardForm
+                        v-if="isCardSelected"
+                        v-model="cardFields"
+                        :disabled="isPaying"
+                    />
+
                     <div class="payment-summary">
                         <div class="summary-row">
                             <span>Prix de l'édition</span>
@@ -644,7 +728,7 @@ const startPayment = async () => {
                     <button
                         @click="startPayment"
                         class="btn-pay"
-                        :disabled="!isPhoneValid || !selectedMethodId || isPaying"
+                        :disabled="!selectedMethodId || isPaying || (isCardSelected ? !isCardValid : !isPhoneValid)"
                     >
                         <i class="fa-solid fa-credit-card me-2"></i>
                         <template v-if="isPaying">Paiement en cours…</template>

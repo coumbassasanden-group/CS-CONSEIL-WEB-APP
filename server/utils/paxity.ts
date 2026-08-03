@@ -31,7 +31,13 @@ export function getPaxity(): PaxityProvider {
     apiToken,
     ...(config.paxityBearer ? { bearerToken: String(config.paxityBearer) } : {}),
     ...(config.paxityBaseUrl ? { baseUrl: String(config.paxityBaseUrl) } : {}),
-    ...(config.paxityWebhookSecret ? { webhookSecret: String(config.paxityWebhookSecret) } : {})
+    ...(config.paxityWebhookSecret ? { webhookSecret: String(config.paxityWebhookSecret) } : {}),
+    // Le paiement par carte n'est ouvert que si Paxity a habilité le business —
+    // sans quoi l'endpoint répond 403. Voir server/api/payment/paxity/card.post.ts.
+    enableCardPayments: String(config.paxityCardEnabled) === 'true',
+    ...(config.paxityDeveloperAccountId
+      ? { developerAccountId: String(config.paxityDeveloperAccountId) }
+      : {})
   })
 
   return provider
@@ -91,6 +97,17 @@ export function toHttpError(error: unknown) {
   if (isH3Error(error)) return error
 
   if (CsPayError.isCsPayError(error)) {
+    // Erreur levée avant tout appel réseau : c'est une validation locale, dont
+    // le message est précis et sûr (il ne contient jamais de donnée de carte).
+    // Le transmettre tel quel aide l'utilisateur à corriger sa saisie.
+    if (error.httpStatus === undefined && error.code === 'INVALID_REQUEST') {
+      return createError({
+        statusCode: 400,
+        statusMessage: error.message,
+        data: { code: error.code }
+      })
+    }
+
     const status =
       error.code === 'INVALID_REQUEST' || error.code === 'INVALID_PHONE' ? 400 :
       error.code === 'DUPLICATE_REFERENCE' ? 409 :

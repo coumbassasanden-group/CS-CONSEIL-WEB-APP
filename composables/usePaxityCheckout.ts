@@ -13,7 +13,10 @@ export const PAXITY_COMPLETED_REFERENCE_KEY = 'paxity_completed_reference'
 export const PAXITY_PENDING_EDITION_PURCHASE_KEY = 'paxity_pending_edition_purchase'
 export const PAXITY_COMPLETED_EDITION_REFERENCE_KEY = 'paxity_completed_edition_reference'
 
-export type PaxityMethodType = 'PUSH' | 'QR_CODE' | 'OTP'
+/** Identifiant réservé à la carte bancaire, qui ne figure pas au catalogue Paxity. */
+export const PAXITY_CARD_METHOD_ID = '__CARD__'
+
+export type PaxityMethodType = 'PUSH' | 'QR_CODE' | 'OTP' | 'CARD'
 export type PaxityPaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
 
 export interface PaxityPaymentMethod {
@@ -34,6 +37,19 @@ export interface PaxityCheckoutPayload {
   reference?: string
   description?: string
   otp?: string
+}
+
+/** Données de carte, transmises au serveur puis immédiatement oubliées. */
+export interface PaxityCardPayload {
+  amount: number
+  cardNumber: string
+  expiryMonth: string
+  expiryYear: string
+  cvv: string
+  holderFirstName: string
+  holderLastName: string
+  reference?: string
+  description?: string
 }
 
 export interface PaxityCheckoutResponse {
@@ -108,6 +124,28 @@ export const usePaxityCheckout = () => {
     }
   }
 
+  /**
+   * Initie un encaissement par carte bancaire.
+   *
+   * ⚠️ Le numéro de carte et le cryptogramme partent vers notre serveur, qui
+   * les relaie à Paxity sans jamais les journaliser ni les conserver. Ne pas
+   * les stocker côté navigateur — ni `localStorage`, ni état persistant — et
+   * vider les champs dès la réponse reçue.
+   *
+   * La route répond `501` tant que Paxity n'a pas habilité le business.
+   */
+  const createCardCheckout = async (payload: PaxityCardPayload) => {
+    loading.value = true
+    try {
+      return await call<PaxityCheckoutResponse>('/api/payment/paxity/card', {
+        method: 'POST',
+        body: payload
+      })
+    } finally {
+      loading.value = false
+    }
+  }
+
   /** État réel de la transaction, lu auprès de Paxity. */
   const getStatus = async (reference: string) => {
     return call<PaxityStatusResponse>('/api/payment/paxity/status', {
@@ -151,6 +189,7 @@ export const usePaxityCheckout = () => {
     error: readonly(error),
     getMethods,
     createCheckout,
+    createCardCheckout,
     getStatus,
     waitForCompletion
   }

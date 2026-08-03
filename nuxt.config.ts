@@ -15,8 +15,15 @@ export default defineNuxtConfig({
     paxityBaseUrl: process.env.PAXITY_BASE_URL || '',
     paxityWebhookSecret: process.env.PAXITY_WEBHOOK_SECRET || '',
 
+    // Paiement par carte. Fermé tant que Paxity n'a pas habilité le business :
+    // `POST /transaction/pay-in-card` répond 403 sinon. Activer côté serveur
+    // ET côté public, l'un ouvre la route, l'autre affiche le formulaire.
+    paxityCardEnabled: process.env.PAXITY_CARD_ENABLED || 'false',
+    paxityDeveloperAccountId: process.env.PAXITY_DEVELOPER_ACCOUNT_ID || '',
+
     public: {
       siteUrl: process.env.SITE_URL || 'https://conseil.coumbassa-sanden.com',
+      paxityCardEnabled: process.env.PAXITY_CARD_ENABLED || 'false',
       apiBaseUrl: process.env.API_BASE_URL || 'https://nextapi.coumbassa-sanden.com',
       apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://nextapi.coumbassa-sanden.com/api/',
     }
