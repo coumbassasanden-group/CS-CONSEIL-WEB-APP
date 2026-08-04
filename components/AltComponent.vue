@@ -730,7 +730,9 @@ const startPayment = async () => {
                         class="btn-pay"
                         :disabled="!selectedMethodId || isPaying || (isCardSelected ? !isCardValid : !isPhoneValid)"
                     >
-                        <i class="fa-solid fa-credit-card me-2"></i>
+                        <!-- Cadenas et non carte bancaire : seuls les moyens mobile money
+                             sont proposés, une icône de carte laissait croire le contraire. -->
+                        <i class="fa-solid fa-lock me-2"></i>
                         <template v-if="isPaying">Paiement en cours…</template>
                         <template v-else>Payer {{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA</template>
                     </button>

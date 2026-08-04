@@ -340,7 +340,7 @@
       <!-- Choix du moyen de paiement pour les abonnements payants -->
       <div v-if="isPaidPlan" class="payment-methods-section">
         <div class="selection-header">
-          <h3><Icon icon="mdi:credit-card-outline" width="24" height="24" /> Moyen de paiement</h3>
+          <h3><Icon icon="mdi:wallet-outline" width="24" height="24" /> Moyen de paiement</h3>
           <p class="selection-subtitle">Sélectionnez le moyen que vous souhaitez utiliser</p>
           <span class="required-badge">Obligatoire</span>
         </div>

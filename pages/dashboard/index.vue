@@ -587,7 +587,7 @@ useHead({
                         </li>
                         <li class="nav-item">
                             <button class="nav-link" :class="{ active: activeTab === 'payments' }" @click="activeTab = 'payments'">
-                                <i class="fa-solid fa-credit-card me-1"></i>Paiements
+                                <i class="fa-solid fa-receipt me-1"></i>Paiements
                             </button>
                         </li>
                     </ul>
@@ -898,7 +898,7 @@ useHead({
                                     <span class="spinner-border spinner-border-sm me-2"></span>Traitement...
                                 </span>
                                 <span v-else>
-                                    <i class="fa-solid fa-credit-card me-2"></i>Payer maintenant
+                                    <i class="fa-solid fa-lock me-2"></i>Payer maintenant
                                 </span>
                             </button>
                         </div>

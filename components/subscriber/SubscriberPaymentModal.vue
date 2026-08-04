@@ -103,7 +103,7 @@
           :disabled="!canPay"
           @click="handlePay"
         >
-          <Icon :icon="isPaying ? 'mdi:loading' : 'mdi:credit-card'" :class="{ spin: isPaying }" />
+          <Icon :icon="isPaying ? 'mdi:loading' : 'mdi:lock'" :class="{ spin: isPaying }" />
           {{ isPaying ? 'Paiement en cours...' : `Payer ${formatPrice(unitPrice)}` }}
         </button>
       </div>
