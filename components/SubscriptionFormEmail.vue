@@ -372,9 +372,10 @@
             />
             <span class="method-logo">
               <img
-                v-if="method.logo"
+                v-if="method.logo && !brokenLogos.has(method.id)"
                 :src="method.logo"
-                :alt="method.name || method.code || 'Moyen de paiement'"
+                alt=""
+                @error="brokenLogos.add(method.id)"
               />
               <Icon v-else icon="mdi:wallet-outline" width="26" height="26" />
             </span>
@@ -530,6 +531,7 @@ const {
   getMethods: getPaxityMethods
 } = usePaxityCheckout()
 const isPaying = ref(false)
+const brokenLogos = ref(new Set<string>())
 const methodsLoading = ref(false)
 const methodsError = ref('')
 const paymentMethods = ref<PaxityPaymentMethod[]>([])

@@ -28,6 +28,42 @@ export interface PaxityPaymentMethod {
   country: string
   phonePrefix: string | null
   instructions: string | null
+  /**
+   * `false` = moyen affiché mais non sélectionnable.
+   *
+   * Sert à la carte bancaire, qu'on montre pour annoncer son arrivée sans
+   * laisser un client y saisir ses coordonnées : Paxity refuse encore
+   * l'endpoint (403) tant que le business n'est pas habilité.
+   */
+  available?: boolean
+}
+
+/**
+ * Ajoute la carte bancaire à la liste des moyens.
+ *
+ * Elle ne figure pas au catalogue Paxity : c'est un endpoint distinct
+ * (`pay-in-card`), donc l'entrée est construite ici.
+ */
+export function appendCardOption(
+  methods: PaxityPaymentMethod[],
+  enabled: boolean
+): PaxityPaymentMethod[] {
+  return [
+    ...methods.map((method) => ({ ...method, available: true })),
+    {
+      id: PAXITY_CARD_METHOD_ID,
+      name: 'Carte bancaire',
+      logo: null,
+      type: 'CARD' as const,
+      currency: 'XOF',
+      country: 'CI',
+      phonePrefix: null,
+      instructions: enabled
+        ? 'Visa ou Mastercard — vous serez peut-être invité à valider auprès de votre banque.'
+        : 'Bientôt disponible : nous attendons son activation par notre prestataire de paiement.',
+      available: enabled,
+    },
+  ]
 }
 
 export interface PaxityCheckoutPayload {

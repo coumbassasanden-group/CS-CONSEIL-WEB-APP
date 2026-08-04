@@ -8,7 +8,8 @@ import {
     PAXITY_CHECKOUT_DETAILS_KEY,
     PAXITY_CHECKOUT_REFERENCE_KEY,
     PAXITY_PENDING_EDITION_PURCHASE_KEY,
-    PAXITY_CARD_METHOD_ID
+    PAXITY_CARD_METHOD_ID,
+    appendCardOption
 } from '~/composables/usePaxityCheckout';
 
 const config = useRuntimeConfig();
@@ -88,6 +89,8 @@ const methodsError = ref('');
 const paymentError = ref('');
 const isPaying = ref(false);
 
+const brokenLogos = ref(new Set());
+
 const selectedMethod = computed(
     () => paymentMethods.value.find((method) => method.id === selectedMethodId.value) || null
 );
@@ -99,23 +102,12 @@ const loadPaymentMethods = async () => {
     methodsError.value = '';
     try {
         const methods = await getPaxityMethods('CI');
+        paymentMethods.value = appendCardOption(methods, cardEnabled.value);
 
-        // La carte ne figure pas au catalogue Paxity : on l'ajoute nous-mêmes.
-        paymentMethods.value = cardEnabled.value
-            ? [...methods, {
-                id: PAXITY_CARD_METHOD_ID,
-                name: 'Carte bancaire',
-                logo: null,
-                type: 'CARD',
-                currency: 'XOF',
-                country: 'CI',
-                phonePrefix: null,
-                instructions: 'Visa ou Mastercard'
-            }]
-            : methods;
-
-        if (!selectedMethodId.value && paymentMethods.value.length) {
-            selectedMethodId.value = paymentMethods.value[0].id;
+        // Ne présélectionne jamais un moyen indisponible.
+        if (!selectedMethodId.value) {
+            const first = paymentMethods.value.find((method) => method.available !== false);
+            if (first) selectedMethodId.value = first.id;
         }
     } catch (error) {
         methodsError.value = 'Impossible de charger les moyens de paiement. Réessayez dans un instant.';
@@ -691,11 +683,24 @@ const startPayment = async () => {
                                 :key="method.id"
                                 type="button"
                                 class="method-option"
-                                :class="{ selected: selectedMethodId === method.id }"
+                                :class="{ selected: selectedMethodId === method.id, unavailable: method.available === false }"
+                                :disabled="method.available === false"
                                 @click="selectedMethodId = method.id"
                             >
-                                <img v-if="method.logo" :src="method.logo" :alt="method.name" class="method-logo" />
+                                <!-- alt vide : les logos sont hébergés chez un tiers qui
+                                     répond parfois 429, et un alt renseigné affichait alors
+                                     le nom du moyen en double. L'icône de repli prend le
+                                     relais si l'image ne charge pas. -->
+                                <img
+                                    v-if="method.logo && !brokenLogos.has(method.id)"
+                                    :src="method.logo"
+                                    alt=""
+                                    class="method-logo"
+                                    @error="brokenLogos.add(method.id)"
+                                />
+                                <i v-else class="fa-solid method-logo-fallback" :class="method.type === 'CARD' ? 'fa-credit-card' : 'fa-mobile-screen-button'"></i>
                                 <span class="method-name">{{ method.name }}</span>
+                                <span v-if="method.available === false" class="method-badge">Bientôt</span>
                             </button>
                         </div>
 
@@ -1334,6 +1339,7 @@ const startPayment = async () => {
 }
 
 .method-option {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1346,8 +1352,37 @@ const startPayment = async () => {
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.method-option:hover {
+.method-option:hover:not(:disabled) {
     border-color: #b9c0cc;
+}
+
+/* Moyen annoncé mais pas encore ouvert (carte bancaire) : visible, non cliquable. */
+.method-option.unavailable {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: #f8fafc;
+}
+
+.method-badge {
+    position: absolute;
+    top: -8px;
+    right: -6px;
+    background: #64748b;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    padding: 2px 7px;
+    border-radius: 999px;
+}
+
+.method-logo-fallback {
+    font-size: 30px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    color: #64748b;
 }
 
 .method-option.selected {

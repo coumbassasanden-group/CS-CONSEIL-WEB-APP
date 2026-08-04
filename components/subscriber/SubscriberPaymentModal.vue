@@ -80,9 +80,10 @@
               />
               <span class="method-logo">
                 <img
-                  v-if="method.logo"
+                  v-if="method.logo && !brokenLogos.has(method.id)"
                   :src="method.logo"
-                  :alt="method.name"
+                  alt=""
+                  @error="brokenLogos.add(method.id)"
                 />
                 <Icon v-else icon="mdi:wallet-outline" />
               </span>
@@ -159,6 +160,7 @@ const methodsError = ref('')
 const paymentMethods = ref<PaxityPaymentMethod[]>([])
 const selectedPaymentMethod = ref('')
 const isPaying = ref(false)
+const brokenLogos = ref(new Set<string>())
 
 const currentLocale = computed(() => {
   const locale = route.path.split('/')[1]
