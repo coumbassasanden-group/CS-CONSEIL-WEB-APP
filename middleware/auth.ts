@@ -28,23 +28,19 @@ export default defineNuxtRouteMiddleware((to, from) => {
       return navigateTo(`/${locale}/alt-news`)
     }
 
-    // Vérifier que le token et l'utilisateur sont valides
+    // Le jeton suffit à rester connecté. Le statut mémorisé ici n'est qu'un
+    // instantané pris à la connexion : un étudiant en attente de validation
+    // était déconnecté à chaque visite, et l'instantané ne se corrigeait
+    // jamais — même une fois son compte validé par l'administration.
+    //
+    // C'est la page qui décide de ce qu'elle affiche à partir du profil
+    // rechargé, et l'accès au premium est contrôlé côté serveur.
     try {
       const authUser = JSON.parse(authUserStr)
-
-      // Vérifier que l'utilisateur est actif (status = 'active')
-      if (authUser.status !== 'active') {
-        console.warn('⚠️ Compte utilisateur inactif')
-        const locale = to.params.locale || 'fr'
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('authUser')
-        localStorage.removeItem('authData')
-        return navigateTo(`/${locale}/alt-news`)
-      }
-
-      console.log('✅ Authentification valide pour', authUser.email)
+      console.log('✅ Session valide pour', authUser.email)
     } catch (error) {
-      console.error('❌ Erreur lors de la vérification de l\'authentification:', error)
+      // Donnée illisible : là, le nettoyage est justifié.
+      console.error('❌ Session illisible, nettoyage :', error)
       localStorage.removeItem('authToken')
       localStorage.removeItem('authUser')
       localStorage.removeItem('authData')

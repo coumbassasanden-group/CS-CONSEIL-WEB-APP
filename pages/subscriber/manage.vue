@@ -1030,7 +1030,12 @@ const loadSubscriptionData = async () => {
           email: subscriber.email,
           firstName: subscriber.first_name,
           lastName: subscriber.last_name,
-          phone: subscriber.phone
+          phone: subscriber.phone,
+          // Rafraîchis depuis le profil : sans cela l'instantané pris à la
+          // connexion reste figé, et un abonné validé depuis continue d'être
+          // vu comme « en attente ».
+          type: subscriber.type,
+          status: subscriber.status
         }
         localStorage.setItem('authUser', JSON.stringify(updatedUser))
 
