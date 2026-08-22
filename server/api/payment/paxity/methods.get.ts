@@ -19,6 +19,21 @@ import { paysDuVisiteur } from '../../../utils/geo'
  * stable ({ id, name, logo }) identique à celle que consommait déjà le
  * sélecteur de moyens de paiement.
  */
+/**
+ * Écarte les instructions qui n'en sont pas.
+ *
+ * Paxity laisse des valeurs de gabarit dans son catalogue — « string » sur
+ * quatre moyens, « Pas d'intruction » (sic) sur quatre autres. Affichées
+ * telles quelles, elles s'invitaient sous le sélecteur de paiement.
+ */
+const instructionsUtiles = (valeur: unknown): string | null => {
+  const texte = String(valeur ?? '').trim()
+  if (!texte) return null
+
+  const inutile = ['string', 'none', 'null', 'pas d\'intruction', 'pas d\'instruction']
+  return inutile.includes(texte.toLowerCase()) ? null : texte
+}
+
 export default defineEventHandler(async (event) => {
   const { country, currency } = getQuery(event)
 
@@ -57,7 +72,7 @@ export default defineEventHandler(async (event) => {
         currency: method.currency,
         country: method.country,
         phonePrefix: method.phonePrefix ?? null,
-        instructions: method.instructions ?? null
+        instructions: instructionsUtiles(method.instructions)
       }))
   } catch (error) {
     throw toHttpError(error)
