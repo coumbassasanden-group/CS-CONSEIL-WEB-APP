@@ -1,0 +1,67 @@
+/*
+ * Corrections d'affichage du widget de paiement Paxity.
+ *
+ * Le widget monte son modal directement dans `document.body`, hors de toute
+ * portée de composant : il faut donc du CSS global pour l'atteindre.
+ *
+ * Notre feuille de style impose une bordure blanche aux `input`. Appliquée aux
+ * champs d'antd, elle les rendait invisibles — bordure blanche sur fond blanc,
+ * seul le texte d'exemple flottait. On rétablit une bordure lisible, sans
+ * toucher au reste de la mise en forme du widget.
+ */
+
+.ant-modal .ant-input,
+.ant-modal .ant-input-affix-wrapper,
+.ant-modal .ant-input-number,
+.ant-modal .ant-picker,
+.ant-modal .ant-select-selector {
+  border-color: #d9d9d9 !important;
+  background-color: #ffffff !important;
+}
+
+.ant-modal .ant-input:hover,
+.ant-modal .ant-picker:hover,
+.ant-modal .ant-input-affix-wrapper:hover {
+  border-color: #a3a3a3 !important;
+}
+
+.ant-modal .ant-input:focus,
+.ant-modal .ant-input-focused,
+.ant-modal .ant-picker-focused,
+.ant-modal .ant-input-affix-wrapper-focused {
+  border-color: #4096ff !important;
+}
+
+/* Un champ en erreur doit rester reconnaissable malgré les règles ci-dessus. */
+.ant-modal .ant-form-item-has-error .ant-input,
+.ant-modal .ant-form-item-has-error .ant-picker,
+.ant-modal .ant-form-item-has-error .ant-input-affix-wrapper {
+  border-color: #ff4d4f !important;
+}
+
+/*
+ * Plan de superposition.
+ *
+ * Le widget monte son modal dans `document.body` avec le z-index par défaut
+ * d'antd (~1000), alors que nos propres modales — achat d'édition, changement
+ * de plan, espace abonné — sont à 9999. Le paiement s'ouvrait donc *derrière*
+ * la fenêtre depuis laquelle on venait de le déclencher.
+ *
+ * On le place franchement au-dessus. Le sélecteur de date d'antd est un
+ * `.ant-picker-dropdown` monté lui aussi dans le body, à part du modal : sans
+ * la règle qui suit, le calendrier de la date d'expiration s'ouvrirait sous le
+ * formulaire qui l'a appelé.
+ */
+.ant-modal-root,
+.ant-modal-wrap,
+.ant-modal-mask {
+  z-index: 100000 !important;
+}
+
+.ant-picker-dropdown,
+.ant-select-dropdown,
+.ant-tooltip,
+.ant-message,
+.ant-notification {
+  z-index: 100010 !important;
+}

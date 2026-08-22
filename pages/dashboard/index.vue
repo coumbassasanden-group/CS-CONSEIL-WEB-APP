@@ -61,7 +61,7 @@ const loadPaymentMethods = async () => {
     methodsLoading.value = true;
     methodsError.value = '';
     try {
-        paymentMethods.value = await getPaxityMethods('CI');
+        paymentMethods.value = await getPaxityMethods();
         if (!selectedMethodId.value && paymentMethods.value.length) {
             selectedMethodId.value = paymentMethods.value[0].id;
         }
@@ -356,7 +356,12 @@ const handleEditionPaymentSuccess = async (paymentReference) => {
             body: JSON.stringify({
                 edition_id: selectedEdition.value.id,
                 payment_reference: paymentReference || transactionId.value,
-                payment_method: 'paxity'
+                payment_method: 'paxity',
+                // Requis par le backend, qui identifie l'acheteur par ces
+                // champs et non par le jeton. Sans eux : 422, achat perdu.
+                email: subscriber.value?.email,
+                first_name: subscriber.value?.first_name,
+                last_name: subscriber.value?.last_name
             })
         });
         

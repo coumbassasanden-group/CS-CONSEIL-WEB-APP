@@ -70,6 +70,143 @@ export function splitPhone(raw: string, expectedPrefix: string): PhoneNumber {
   return { prefix: expectedPrefix, number: digits }
 }
 
+/** Devise dans laquelle nos tarifs sont libellés. */
+export const DEVISE_DE_REFERENCE = 'XOF'
+
+/**
+ * Devises sans sous-unité : un montant s'y exprime en nombre entier.
+ *
+ * Y envoyer des décimales fait rejeter la transaction par l'opérateur.
+ */
+const DEVISES_SANS_DECIMALE = new Set(['XOF', 'XAF', 'GNF'])
+
+/**
+ * Convertit un montant via Paxity.
+ *
+ * `GET /manage/convert` — l'endpoint réel, malgré une documentation qui annonce
+ * `/transaction/convert`. Il renvoie un nombre nu, pas un objet JSON.
+ *
+ * Le calcul reste côté serveur : c'est lui qui décide combien est encaissé, le
+ * navigateur ne fait que l'afficher.
+ */
+export async function convertirMontant(
+  montant: number,
+  deVersDevise: string
+): Promise<number> {
+  const devise = String(deVersDevise || '').toUpperCase()
+  if (!devise || devise === DEVISE_DE_REFERENCE) return montant
+
+  const config = useRuntimeConfig()
+  const base = String(config.paxityBaseUrl || 'https://transaction.paxity.io/api/v1')
+    .replace(/\/$/, '')
+
+  let brut: unknown
+  try {
+    brut = await $fetch(`${base}/manage/convert`, {
+      query: {
+        fromCurrency: DEVISE_DE_REFERENCE,
+        toCurrency: devise,
+        amount: montant
+      },
+      headers: {
+        'x-api-key': String(config.paxityApiKey || ''),
+        'X-API-TOKEN': String(config.paxityApiToken || '')
+      }
+    })
+  } catch {
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Le taux de change est indisponible. Réessayez dans un instant.'
+    })
+  }
+
+  const converti = Number(brut)
+  if (!Number.isFinite(converti) || converti <= 0) {
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Le taux de change renvoyé est inexploitable.'
+    })
+  }
+
+  // Arrondi au plus proche centime, ou à l'unité pour les devises qui n'ont pas
+  // de sous-unité. On arrondit vers le haut : mieux vaut encaisser un centime
+  // de trop que de laisser une conversion grignoter le prix à chaque vente.
+  return DEVISES_SANS_DECIMALE.has(devise)
+    ? Math.ceil(converti)
+    : Math.ceil(converti * 100) / 100
+}
+
+/**
+ * Opérateurs ivoiriens, identifiés par les deux premiers chiffres du numéro.
+ *
+ * Depuis la renumérotation de 2021, un numéro ivoirien tient sur dix chiffres
+ * dont les deux premiers désignent l'opérateur — le zéro de tête en fait partie.
+ */
+const CI_OPERATORS = [
+  // Moov n'a pas de méthode ivoirienne au catalogue Paxity : un numéro Moov
+  // n'est encaissable qu'via Wave, d'où l'absence de `method`.
+  { id: 'MOOV', label: 'Moov', prefixes: ['01', '02', '03'], method: null },
+  { id: 'MTN', label: 'MTN', prefixes: ['04', '05', '06'], method: 'MTN Mobile Money' },
+  { id: 'ORANGE', label: 'Orange', prefixes: ['07', '08', '09'], method: 'Orange Money' }
+] as const
+
+/**
+ * Méthodes dont l'opérateur est imposé.
+ *
+ * `WAVECI` en est volontairement absent : Wave est un compte fintech, pas un
+ * opérateur, et fonctionne avec n'importe quel numéro ivoirien.
+ */
+const CI_METHOD_OPERATOR: Record<string, string> = {
+  MTNCI: 'MTN',
+  OMCI: 'ORANGE'
+}
+
+/**
+ * Refuse un numéro qui n'appartient pas à l'opérateur du moyen choisi.
+ *
+ * Sans ce garde-fou, la transaction part chez Paxity, est acceptée, puis
+ * rejetée par l'opérateur une minute plus tard sans motif exploitable : c'est
+ * ce qui a fait échouer toutes les tentatives MTN d'août 2026, payées avec des
+ * numéros en 07 (donc Orange).
+ *
+ * Le contrôle ne tranche que sur preuve positive d'incompatibilité. Un préfixe
+ * inconnu au plan de numérotation passe : mieux vaut laisser Paxity refuser un
+ * numéro exotique que bloquer un paiement légitime sur une règle incomplète.
+ */
+export function assertPhoneMatchesMethod(
+  methodId: string,
+  localNumber: string,
+  country: string
+) {
+  if (String(country || '').toUpperCase() !== 'CI') return
+
+  const expectedId = CI_METHOD_OPERATOR[String(methodId || '').toUpperCase()]
+  if (!expectedId) return
+
+  const head = String(localNumber || '').slice(0, 2)
+  const actual = CI_OPERATORS.find((operator) => operator.prefixes.includes(head))
+  if (!actual || actual.id === expectedId) return
+
+  const expected = CI_OPERATORS.find((operator) => operator.id === expectedId)!
+  const attendus = expected.prefixes.slice(0, -1).join(', ') +
+    ` ou ${expected.prefixes[expected.prefixes.length - 1]}`
+
+  // Renvoyer vers l'opérateur du numéro n'a de sens que s'il est encaissable.
+  // Sinon Wave prend le relais : c'est un compte fintech, pas un opérateur, et
+  // il accepte n'importe quel numéro ivoirien.
+  const alternative = actual.method
+    ? `Choisissez ${actual.method}`
+    : `${actual.label} n'est pas pris en charge en Côte d'Ivoire — choisissez Wave`
+
+  throw createError({
+    statusCode: 400,
+    statusMessage:
+      `Ce numéro commence par ${head} : c'est un numéro ${actual.label}. ` +
+      `Les numéros ${expected.label} commencent par ${attendus}. ` +
+      `${alternative}, ou saisissez un numéro ${expected.label}.`
+  })
+}
+
 /**
  * Complète les paramètres d'un paiement à partir de la méthode choisie.
  *
@@ -132,9 +269,15 @@ export function toHttpError(error: unknown) {
 function isH3Error(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false
   const candidate = error as Record<string, unknown>
+  // Ni `__h3_error__` ni `name === 'H3Error'` ne sont garantis d'une version de
+  // h3 à l'autre : un `createError({ statusCode, statusMessage })` légitime
+  // était pris pour une erreur inconnue et réemballé en 500 générique, ce qui
+  // masquait son message. La présence du couple statusCode/statusMessage
+  // suffit à l'identifier — une CsPayError porte `httpStatus`, pas `statusCode`.
   return (
     candidate.__h3_error__ === true ||
-    (typeof candidate.statusCode === 'number' && candidate.name === 'H3Error')
+    candidate.name === 'H3Error' ||
+    (typeof candidate.statusCode === 'number' && typeof candidate.statusMessage === 'string')
   )
 }
 

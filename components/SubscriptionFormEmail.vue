@@ -130,16 +130,27 @@
         <!-- Mot de passe -->
         <div class="form-group">
           <label for="password">Mot de passe *</label>
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            required
-            minlength="8"
-            placeholder="Minimum 8 caractères"
-            :disabled="isProcessing"
-            class="form-control"
-          />
+          <div class="password-wrapper">
+            <input
+              id="password"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              required
+              minlength="8"
+              placeholder="Minimum 8 caractères"
+              :disabled="isProcessing"
+              class="form-control"
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              :aria-label="showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+              :title="showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+              @click="showPassword = !showPassword"
+            >
+              <i :class="showPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'"></i>
+            </button>
+          </div>
           <small class="form-text">
             Choisissez un mot de passe sécurisé (min 8 caractères)
           </small>
@@ -177,15 +188,27 @@
         <!-- Téléphone -->
         <div class="form-group">
           <label for="phone">Téléphone *</label>
-          <input
-            id="phone"
-            v-model="subscriptionForm.phone"
-            type="tel"
-            required
-            placeholder="+33612345678"
-            :disabled="isProcessing"
-            class="form-control"
-          />
+          <div class="phone-wrapper">
+            <select
+              v-model="phoneCountryCode"
+              class="form-control phone-code"
+              :disabled="isProcessing"
+              aria-label="Indicatif pays"
+            >
+              <option v-for="c in COUNTRY_CODES" :key="c.code + c.name" :value="c.code">
+                {{ c.flag }} {{ c.code }}
+              </option>
+            </select>
+            <input
+              id="phone"
+              v-model="phoneLocal"
+              type="tel"
+              required
+              placeholder="0102030405"
+              :disabled="isProcessing"
+              class="form-control phone-number"
+            />
+          </div>
         </div>
 
         <!-- Bouton soumettre -->
@@ -356,7 +379,21 @@
           </button>
         </div>
 
-        <div v-else class="payment-methods-grid">
+        <div v-else class="country-picker">
+          <label class="country-picker-label">Pays du moyen de paiement</label>
+          <select v-model="paysChoisi" class="country-picker-select">
+            <option v-for="p in pays" :key="p.code" :value="p.code">{{ p.nom }}</option>
+          </select>
+        </div>
+
+        <p v-if="conversionEnCours" class="conversion-note">Calcul du montant…</p>
+        <p v-else-if="montantConverti" class="conversion-note">
+          Ce moyen encaisse en {{ montantConverti.to }} : vous serez débité de
+          <strong>{{ montantConverti.convertedAmount }} {{ montantConverti.to }}</strong>
+          (équivalent de {{ montantConverti.amount }} FCFA).
+        </p>
+
+        <div v-if="!methodsLoading && !methodsError" class="payment-methods-grid">
           <label
             v-for="method in paymentMethods"
             :key="getPaymentMethodValue(method)"
@@ -514,12 +551,16 @@ import { useRouter } from 'vue-router'
 import { useSubscription } from '~/composables/useSubscription'
 import { useAuth } from '~/composables/useAuth'
 import {
+  PAXITY_CARD_METHOD_ID,
   PAXITY_CHECKOUT_DETAILS_KEY,
   PAXITY_CHECKOUT_REFERENCE_KEY,
   PAXITY_PENDING_SUBSCRIPTION_KEY,
+  appendCardOption,
   type PaxityPaymentMethod,
   usePaxityCheckout
 } from '~/composables/usePaxityCheckout'
+import { usePaxityWidget } from '~/composables/usePaxityWidget'
+import { usePaymentCountries, useMontantConverti } from '~/composables/usePaymentCountries'
 import {Icon} from "@iconify/vue"
 
 const router = useRouter()
@@ -530,6 +571,13 @@ const {
   error: paxityCheckoutError,
   getMethods: getPaxityMethods
 } = usePaxityCheckout()
+const { ouvrir: ouvrirWidgetCarte, loading: widgetLoading } = usePaxityWidget()
+const { pays, paysChoisi, moyensDuPays, charger: chargerCatalogue } = usePaymentCountries()
+
+/** La carte n'est proposée que si le widget Paxity est actif. */
+const cardEnabled = computed(() => String(config.public.paxityCardWidget) === 'true')
+const isCardSelected = computed(() => selectedPaymentMethod.value === PAXITY_CARD_METHOD_ID)
+
 const isPaying = ref(false)
 const brokenLogos = ref(new Set<string>())
 const methodsLoading = ref(false)
@@ -572,7 +620,15 @@ const isStudentPlan = computed(() => {
          (plan.name && plan.name.toLowerCase().includes('student'))
 })
 
-const transactionId = `TXN_altnews_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+// Référence marchand. `SUB-{plan}-S{abonné}-{horodatage}` : le webhook Paxity
+// applique le plan côté serveur même si le navigateur ne revient pas (carte,
+// onglet fermé). Calculée à la demande : l'abonné n'existe qu'après la
+// création du compte.
+let transactionId = ''
+const nouvelleReference = () => {
+  transactionId = `SUB-${subscriptionForm.value.planId}-S${subscriptionForm.value.userId || 0}-${Date.now()}`
+  return transactionId
+}
 
 // Note: Les achats à l'unité sont gérés séparément via la page des éditions
 
@@ -607,6 +663,64 @@ const {
 const currentStep = ref<'email-check' | 'existing-user' | 'new-user' | 'edit-profile' | 'select-plan' | 'confirmation'>('email-check')
 const emailInput = ref('')
 const password = ref('')
+const showPassword = ref(false)
+
+// Indicatif pays pour le telephone (Cote d'Ivoire par defaut)
+const COUNTRY_CODES = [
+  { code: '+225', name: "Côte d'Ivoire", flag: '🇨🇮' },
+  { code: '+226', name: 'Burkina Faso', flag: '🇧🇫' },
+  { code: '+223', name: 'Mali', flag: '🇲🇱' },
+  { code: '+221', name: 'Sénégal', flag: '🇸🇳' },
+  { code: '+229', name: 'Bénin', flag: '🇧🇯' },
+  { code: '+228', name: 'Togo', flag: '🇹🇬' },
+  { code: '+224', name: 'Guinée', flag: '🇬🇳' },
+  { code: '+227', name: 'Niger', flag: '🇳🇪' },
+  { code: '+237', name: 'Cameroun', flag: '🇨🇲' },
+  { code: '+241', name: 'Gabon', flag: '🇬🇦' },
+  { code: '+242', name: 'Congo', flag: '🇨🇬' },
+  { code: '+243', name: 'RD Congo', flag: '🇨🇩' },
+  { code: '+212', name: 'Maroc', flag: '🇲🇦' },
+  { code: '+216', name: 'Tunisie', flag: '🇹🇳' },
+  { code: '+213', name: 'Algérie', flag: '🇩🇿' },
+  { code: '+33', name: 'France', flag: '🇫🇷' },
+  { code: '+32', name: 'Belgique', flag: '🇧🇪' },
+  { code: '+41', name: 'Suisse', flag: '🇨🇭' },
+  { code: '+1', name: 'USA / Canada', flag: '🇺🇸' },
+  { code: '+44', name: 'Royaume-Uni', flag: '🇬🇧' }
+]
+
+const phoneCountryCode = ref('+225')
+const phoneLocal = ref('')
+
+// Decoupe un numero complet en (indicatif, partie locale).
+// Les indicatifs les plus longs sont testes en premier pour eviter que +22 masque +225.
+const splitPhone = (full) => {
+  const value = String(full || '').replace(/[\s.-]/g, '')
+  if (!value) return { code: phoneCountryCode.value, local: '' }
+
+  const sorted = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length)
+  for (const c of sorted) {
+    if (value.startsWith(c.code)) {
+      return { code: c.code, local: value.slice(c.code.length) }
+    }
+  }
+  return { code: phoneCountryCode.value, local: value.replace(/^\+/, '') }
+}
+
+// Renseigne les deux champs a partir d'un numero complet (pre-remplissage)
+const setPhone = (full) => {
+  const { code, local } = splitPhone(full)
+  phoneCountryCode.value = code
+  phoneLocal.value = local
+}
+
+// subscriptionForm.phone reste la source unique envoyee a l'API.
+// On ne retire pas le zero initial : en Cote d'Ivoire il fait partie du numero
+// (+225 07 77 54 62 21), contrairement a la France par exemple.
+watch([phoneCountryCode, phoneLocal], ([code, local]) => {
+  const digits = String(local || '').replace(/[^\d]/g, '')
+  subscriptionForm.value.phone = digits ? `${code}${digits}` : ''
+})
 const originalUserData = ref<any>(null)
 const selectedPlanBeforeAuth = ref<string | null>(null)
 const selectedPlanDetails = ref<any>(null)
@@ -618,8 +732,12 @@ const shouldShowRecap = computed(() => {
   return result
 })
 
+const { tarif: tarifRecette } = useModeTest()
+
 const selectedPlanPrice = computed(() => {
-  return Number(selectedPlanDetails.value?.price ?? getSelectedPlan.value?.price ?? 0)
+  const reel = Number(selectedPlanDetails.value?.price ?? getSelectedPlan.value?.price ?? 0)
+  // Sur une URL de recette, on encaisse 100 F au lieu du tarif du plan.
+  return tarifRecette(reel)
 })
 
 const isPaidPlan = computed(() => {
@@ -632,6 +750,19 @@ const selectedMethodDetails = computed(
   () => paymentMethods.value.find(method => method.id === selectedPaymentMethod.value) || null
 )
 
+const { converti: montantConverti, chargement: conversionEnCours } = useMontantConverti(
+  () => selectedPlanPrice.value,
+  () => selectedMethodDetails.value?.currency
+)
+
+watch(paysChoisi, () => {
+  if (!paymentMethods.value.length) return
+  paymentMethods.value = appendCardOption(moyensDuPays.value, cardEnabled.value)
+  if (!paymentMethods.value.some(method => method.id === selectedPaymentMethod.value)) {
+    selectedPaymentMethod.value = paymentMethods.value.find(method => method.available !== false)?.id || ''
+  }
+})
+
 const loadPaymentMethods = async () => {
   if (methodsLoading.value) return
 
@@ -639,7 +770,8 @@ const loadPaymentMethods = async () => {
   methodsError.value = ''
 
   try {
-    paymentMethods.value = await getPaxityMethods('CI')
+    await chargerCatalogue()
+    paymentMethods.value = appendCardOption(moyensDuPays.value, cardEnabled.value)
 
     const selectedMethodStillExists = paymentMethods.value.some(
       method => getPaymentMethodValue(method) === selectedPaymentMethod.value
@@ -738,7 +870,7 @@ onMounted(() => {
       subscriptionForm.value.email = user.email || ''
       subscriptionForm.value.firstName = user.firstName || ''
       subscriptionForm.value.lastName = user.lastName || ''
-      subscriptionForm.value.phone = user.phone || ''
+      setPhone(user.phone || '')
 
       // S'assurer que userId est défini - utiliser l'id ou générer un identifiant temporaire basé sur l'email
       const userId = user.id || user.userId || user.subscriber_id
@@ -848,7 +980,7 @@ const proceedToPlans = () => {
       subscriptionForm.value.email = userData.email
       subscriptionForm.value.firstName = userData.firstName
       subscriptionForm.value.lastName = userData.lastName
-      subscriptionForm.value.phone = userData.phone
+      setPhone(userData.phone)
     } catch (e) {
       console.error('Erreur lors de la restauration des données utilisateur:', e)
     }
@@ -932,7 +1064,7 @@ const backToEmailCheck = () => {
   password.value = ''
   subscriptionForm.value.firstName = ''
   subscriptionForm.value.lastName = ''
-  subscriptionForm.value.phone = ''
+  setPhone('')
   currentStep.value = 'email-check'
 }
 
@@ -1042,6 +1174,38 @@ const payWithPaxity = async (amount: number) => {
     return
   }
 
+  // Carte : le widget Paxity affiche son propre formulaire et collecte le
+  // numéro chez lui. Rien ne transite par nos serveurs.
+  if (isCardSelected.value) {
+    errorMessage.value = ''
+    try {
+      // Le widget ne revient pas vers le site : c'est le webhook qui appliquera
+      // le plan, et il n'a pas le fichier. Le justificatif étudiant part donc
+      // avant l'ouverture du paiement.
+      if (subscriptionForm.value.studentProof) {
+        const fd = new FormData()
+        fd.append('student_proof', subscriptionForm.value.studentProof)
+        const token = localStorage.getItem('authToken') || localStorage.getItem('auth_token')
+        await fetch(`${config.public.apiSubcriptionUrl}subscription/student-proof`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd
+        })
+      }
+
+      await ouvrirWidgetCarte({
+        amount,
+        currency: 'XOF',
+        country: 'CI',
+        idClient: nouvelleReference(),
+        ipn: `${window.location.origin}/api/payment/paxity/webhook`
+      })
+    } catch (error: any) {
+      errorMessage.value = error?.message || 'Impossible d\'ouvrir le paiement par carte.'
+    }
+    return
+  }
+
   // Seules les méthodes QR_CODE renvoient une page opérateur ; les méthodes
   // PUSH se valident sur le téléphone du client, sans redirection.
   const expectsRedirect = selectedMethodDetails.value?.type === 'QR_CODE'
@@ -1058,7 +1222,7 @@ const payWithPaxity = async (amount: number) => {
       method: selectedPaymentMethod.value,
       amount,
       phone: subscriptionForm.value.phone,
-      reference: transactionId,
+      reference: nouvelleReference(),
       description: `Abonnement ALT News - ${subscriptionForm.value.planId}`
     })
 
@@ -1471,6 +1635,35 @@ const handleFinish = () => {
   background: #f9fafb;
   border-radius: 8px;
   padding: 1rem;
+}
+
+
+.country-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.9rem;
+}
+.country-picker-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+.country-picker-select {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
+  background: #fff;
+}
+.conversion-note {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  line-height: 1.5;
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
 }
 
 .payment-methods-grid {
@@ -2203,6 +2396,66 @@ const handleFinish = () => {
 
   .success-icon {
     font-size: 2.5rem;
+  }
+}
+
+/* Champ mot de passe avec bouton oeil */
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper .form-control {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.password-toggle:hover {
+  color: #d4b128;
+  background: #f3f4f6;
+}
+
+/* Telephone : indicatif + numero */
+.phone-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.phone-wrapper .phone-code {
+  flex: 0 0 8.5rem;
+  width: 8.5rem;
+  cursor: pointer;
+}
+
+.phone-wrapper .phone-number {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .phone-wrapper .phone-code {
+    flex-basis: 7rem;
+    width: 7rem;
   }
 }
 </style>

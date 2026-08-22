@@ -197,6 +197,20 @@ const isOpen = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
+// « Se souvenir de moi » : la case n'était reliée à rien. Elle mémorise
+// désormais l'adresse e-mail, préremplie et cochée à l'ouverture suivante.
+// (La session elle-même est déjà persistante : le jeton n'expire pas.)
+const EMAIL_MEMORISE = 'altnews_remembered_email'
+
+watch(isOpen, (ouvert) => {
+  if (!ouvert || typeof window === 'undefined') return
+  const memorise = localStorage.getItem(EMAIL_MEMORISE)
+  if (memorise) {
+    form.value.email = memorise
+    form.value.remember = true
+  }
+}, { immediate: true })
+
 // Méthodes
 const close = () => {
   isOpen.value = false
@@ -256,6 +270,12 @@ const handleLogin = async () => {
 
       // Sauvegarder le token JWT
       localStorage.setItem('authToken', response.token)
+
+      if (form.value.remember) {
+        localStorage.setItem(EMAIL_MEMORISE, form.value.email)
+      } else {
+        localStorage.removeItem(EMAIL_MEMORISE)
+      }
 
       // Sauvegarder les données de connexion pour la réutilisation
       localStorage.setItem('authData', JSON.stringify({

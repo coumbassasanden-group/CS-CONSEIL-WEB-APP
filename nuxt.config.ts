@@ -21,9 +21,25 @@ export default defineNuxtConfig({
     paxityCardEnabled: process.env.PAXITY_CARD_ENABLED || 'false',
     paxityDeveloperAccountId: process.env.PAXITY_DEVELOPER_ACCOUNT_ID || '',
 
+    // Secret partagé avec nextapi : le webhook Paxity s'en sert pour
+    // enregistrer les achats côté backend (surchargé par NUXT_INTERNAL_API_SECRET).
+    internalApiSecret: process.env.INTERNAL_API_SECRET || '',
+
+    // Base DB-IP utilisée pour proposer les moyens de paiement du pays du
+    // visiteur. Chemin configurable : le fichier appartient à une autre
+    // application, sa disparition ne doit pas casser le paiement.
+    geoipDbPath: process.env.GEOIP_DB_PATH
+      || '/www/wwwroot/matomo.altdigit.africa/misc/DBIP-City.mmdb',
+
     public: {
       siteUrl: process.env.SITE_URL || 'https://conseil.coumbassa-sanden.com',
       paxityCardEnabled: process.env.PAXITY_CARD_ENABLED || 'false',
+
+      // Ouvre la carte via le widget hébergé par Paxity, qui collecte lui-même
+      // le numéro : nos serveurs ne voient jamais de PAN. Distinct de
+      // `paxityCardEnabled`, qui gouverne notre route /card, laquelle reçoit le
+      // numéro en clair et doit rester fermée.
+      paxityCardWidget: process.env.PAXITY_CARD_WIDGET || 'false',
       apiBaseUrl: process.env.API_BASE_URL || 'https://nextapi.coumbassa-sanden.com',
       apiSubcriptionUrl: process.env.API_SUBSCRIPTION_URL || 'https://nextapi.coumbassa-sanden.com/api/',
     }
@@ -38,7 +54,9 @@ export default defineNuxtConfig({
     '/assets/css/magnific-popup.css',
     '/assets/css/font-awesome-pro.css',
     '/assets/css/spacing.css',
-    '/assets/css/main.css'
+    '/assets/css/main.css',
+    // En dernier : doit l'emporter sur les bordures blanches du thème.
+    '/assets/css/paxity-widget.css'
   ],
 
   app: {

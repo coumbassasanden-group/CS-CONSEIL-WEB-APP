@@ -26,7 +26,7 @@ const hasPremiumPlan = computed(() => {
     if (!user) return false;
 
     // Les types de plans premium qui donnent accès au contenu
-    const premiumTypes = ['annual', 'student', 'monthly'];
+    const premiumTypes = ['annual', 'student', 'student_iua', 'monthly'];
     const hasPremiumType = premiumTypes.includes(user.type);
 
     // Vérifier si l'abonnement n'est pas expiré

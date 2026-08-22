@@ -22,3 +22,6 @@ logs
 .env
 .env.*
 !.env.example
+
+# Banc d'essai widget Paxity : contient des cles de production en clair.
+pages/tests-lvt2ZhTOEtoEIw/

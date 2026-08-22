@@ -65,7 +65,7 @@ const POLL_TIMEOUT_MS = 10 * 60 * 1000
 
 const route = useRoute()
 const config = useRuntimeConfig()
-const { getAuthToken } = useAuth()
+const { getAuthToken, getAuthUser } = useAuth()
 
 const {
   getStatus,
@@ -183,6 +183,22 @@ const finalizeEditionPurchase = async () => {
       throw new Error('Paiement confirmé, mais votre session a expiré. Reconnectez-vous pour enregistrer l’achat.')
     }
 
+    // L'identité vient de la session, avec repli sur ce qui a été mémorisé au
+    // lancement du paiement : l'utilisateur a pu revenir dans un autre onglet.
+    const utilisateur = getAuthUser() || {}
+    const acheteur = {
+      email: utilisateur.email || pending.email || '',
+      firstName: utilisateur.firstName || pending.firstName || '',
+      lastName: utilisateur.lastName || pending.lastName || ''
+    }
+
+    if (!acheteur.email || !acheteur.firstName || !acheteur.lastName) {
+      throw new Error(
+        `Paiement confirmé, mais votre profil est incomplet (nom, prénom ou e-mail). `
+        + `Contactez-nous avec la référence ${reference.value}.`
+      )
+    }
+
     const response = await fetch(`${config.public.apiBaseUrl}/api/subscription/purchase-edition`, {
       method: 'POST',
       headers: {
@@ -193,7 +209,14 @@ const finalizeEditionPurchase = async () => {
       body: JSON.stringify({
         edition_id: edition.id,
         payment_reference: reference.value,
-        payment_method: 'paxity'
+        payment_method: 'paxity',
+        // Le backend identifie l'acheteur par ces trois champs, pas par le
+        // jeton : `purchaseEdition` fait un `firstOrCreate` sur l'email. Les
+        // omettre faisait échouer l'enregistrement en 422 — le client payait
+        // et son édition n'apparaissait jamais.
+        email: acheteur.email,
+        first_name: acheteur.firstName,
+        last_name: acheteur.lastName
       })
     })
 

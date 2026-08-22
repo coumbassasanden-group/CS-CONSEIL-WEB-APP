@@ -19,6 +19,7 @@
     "jarallax": "^2.2.1",
     "jquery": "^3.7.1",
     "magnific-popup": "^1.2.0",
+    "maxmind": "^5.0.7",
     "nuxt": "^3.21.4",
     "nuxt-swiper": "^2.0.1",
     "pinia": "^3.0.4",

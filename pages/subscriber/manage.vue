@@ -3,6 +3,13 @@
     <!-- Toast Notification -->
     <SubscriberToast :toast="toast" @close="toast.visible = false" />
 
+    <!-- Bandeau de recette : cette page encaisse 100 F au lieu du tarif réel. -->
+    <div v-if="modeTest" class="bandeau-recette">
+      <strong>Mode recette</strong> — tous les paiements de cette page sont ramenés à
+      <strong>100 FCFA</strong> au lieu du tarif réel. Les débits sont bien réels.
+      Ne pas communiquer cette adresse aux clients.
+    </div>
+
     <div class="container">
       <div class="page-header">
         <div class="header-top">
@@ -39,7 +46,7 @@
         <SubscriberExpirationAlert
           v-if="isExpirationSoon"
           :days-until-expiration="daysUntilExpiration!"
-          :renew-link="`/${currentLocale}/subscriber`"
+          :renew-link="`/${currentLocale}/alt-news`"
         />
 
         <!-- Plan Info Card -->
@@ -250,7 +257,7 @@
             empty-description="Les nouvelles éditions premium seront disponibles bientôt."
             :api-base-url="config.public.apiBaseUrl"
             :downloading-id="downloadingId"
-            unit-price="2 000"
+            :unit-price="formatPriceDisplay(UNIT_PRICE)"
             :is-favorite="isFavorite"
             :is-locked="(edition) => !canAccessPremium && !isEditionPurchased(edition.id)"
             :is-purchased="isEditionPurchased"
@@ -264,7 +271,7 @@
             <template #upgrade-banner>
               <SubscriberUpgradeBanner
                 v-if="!canAccessPremium"
-                :upgrade-link="`/${currentLocale}/subscriber`"
+                :upgrade-link="`/${currentLocale}/alt-news`"
               />
             </template>
           </SubscriberEditionsGrid>
@@ -310,9 +317,9 @@
             <span class="empty-icon">📭</span>
             <h2>Aucun abonnement actif</h2>
             <p>Abonnez-vous pour acceder a toutes les editions ALT News</p>
-            <NuxtLink :to="`/${currentLocale}/subscriber`" class="btn-primary">
+            <button type="button" class="btn-primary" @click="showUpgradeModal = true">
               Decouvrir nos offres
-            </NuxtLink>
+            </button>
           </div>
         </div>
       </div>
@@ -418,7 +425,10 @@ const showPaymentModal = ref(false)
 const showUpgradeModal = ref(false)
 const showLoginModal = ref(false)
 const editionToBuy = ref<any>(null)
-const UNIT_PRICE = 2000 // Prix unitaire en FCFA
+const { actif: modeTest, tarif } = useModeTest()
+
+// Prix unitaire d'une édition, ramené à 100 F sur l'URL de recette.
+const UNIT_PRICE = computed(() => tarif(2000))
 
 // Password change form
 const passwordForm = ref({
@@ -526,9 +536,16 @@ const filterByFavorites = (editions: any[]) => {
 }
 
 // Computed
+// Types donnant acces a tout le premium (aligne sur canAccessPaidEdition cote API).
+// 'student_iua' etait absent : les abonnes IUA restaient bloques malgre un abonnement valide.
+const PREMIUM_PLAN_TYPES = ['annual', 'student', 'student_iua', 'monthly']
+
 const canAccessPremium = computed(() => {
   const planType = subscriptionData.value.plan?.type
-  return planType === 'annual' || planType === 'student' || planType === 'monthly'
+  // Le type ne suffit pas : un étudiant dont la carte n'est pas encore
+  // validée a bien le type « student », mais son statut est
+  // `pending_validation`. L'accès n'est ouvert qu'une fois l'abonnement actif.
+  return PREMIUM_PLAN_TYPES.includes(planType) && subscriptionData.value.isActive === true
 })
 
 // Helper function to sort editions
@@ -850,7 +867,7 @@ const fetchAllEditions = async () => {
         date: e.date || e.publication_date || e.created_at,
         image: e.image || e.cover_image,
         description: e.description,
-        price: e.price || UNIT_PRICE,
+        price: e.price || UNIT_PRICE.value,
         is_free: e.has_free_version || e.is_free || false,
         type: (e.has_free_version || e.is_free) ? 'free' : 'premium',
         edition_number: e.edition_number || (e.title ? String(e.title).match(/\d+/g)?.[0] : null),
@@ -868,6 +885,46 @@ const fetchAllEditions = async () => {
 const fetchMyEditions = async () => {
   loadingMyEditions.value = true
   try {
+    // Source de verite : les achats enregistres cote serveur.
+    // Le localStorage ne sert plus que de repli hors-ligne : sinon un numero paye
+    // disparait des qu'on change de navigateur, d'appareil ou qu'on vide le cache.
+    const token = localStorage.getItem('authToken')
+
+    if (token) {
+      const response = await fetch(`${config.public.apiBaseUrl}/api/subscription/profile`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const purchases = (data.purchases || []).filter((p: any) => p.status === 'completed')
+
+        myPurchasedEditions.value = purchases.map((p: any) => {
+          const edition = p.edition || {}
+          return {
+            id: edition.id ?? p.edition_id,
+            title: edition.title,
+            date: edition.publication_date || edition.date,
+            image: edition.cover_image || edition.image,
+            description: edition.description,
+            price: p.amount ?? edition.price,
+            edition_number: edition.edition_number,
+            pdf_url: edition.pdf_url || edition.pdf_file,
+            free_pdf_file: edition.free_pdf_file,
+            purchased_at: p.created_at
+          }
+        })
+
+        localStorage.setItem('purchasedEditions', JSON.stringify(myPurchasedEditions.value))
+        return
+      }
+    }
+
+    // Repli : cache local si l'API est injoignable ou la session expiree
     if (myPurchasedEditions.value.length === 0) {
       const storedEditions = localStorage.getItem('purchasedEditions')
       if (storedEditions) {
@@ -876,6 +933,12 @@ const fetchMyEditions = async () => {
     }
   } catch (error) {
     console.error('Erreur lors du chargement de vos editions:', error)
+    if (myPurchasedEditions.value.length === 0) {
+      const storedEditions = localStorage.getItem('purchasedEditions')
+      if (storedEditions) {
+        myPurchasedEditions.value = JSON.parse(storedEditions)
+      }
+    }
   } finally {
     loadingMyEditions.value = false
   }
@@ -884,26 +947,51 @@ const fetchMyEditions = async () => {
 const fetchPaymentHistory = async () => {
   loadingPayments.value = true
   try {
-    const user = getAuthUser()
-    if (user?.id) {
-      const storedPayments = localStorage.getItem('paymentHistory')
-      if (storedPayments) {
-        paymentHistory.value = JSON.parse(storedPayments)
-      } else {
-        if (subscriptionData.value.plan && subscriptionData.value.plan.price > 0) {
-          paymentHistory.value = [{
-            id: 1,
-            date: subscriptionData.value.startDate || new Date(),
-            description: `Abonnement ${subscriptionData.value.plan.name}`,
-            amount: subscriptionData.value.plan.price,
-            type: 'subscription',
-            status: 'completed',
-            invoiceUrl: null
-          }]
-          localStorage.setItem('paymentHistory', JSON.stringify(paymentHistory.value))
-        }
-      }
+    // Source de vérité : le backend. L'ancien cache local ne voyait jamais les
+    // paiements réels — l'historique restait vide après un achat.
+    const token = localStorage.getItem('authToken')
+    if (!token) return
+
+    const response = await fetch(`${config.public.apiBaseUrl}/api/subscription/profile`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+    })
+    if (!response.ok) return
+
+    const data = await response.json()
+    const subscriber = data.subscriber || {}
+    const lignes: any[] = []
+
+    if (Number(subscriber.amount_paid) > 0 && subscriber.payment_reference) {
+      const nomPlan = subscriber.type === 'annual' ? 'Premium Annuel'
+        : subscriber.type === 'student' ? 'Étudiant'
+        : subscriber.type
+      lignes.push({
+        id: `sub-${subscriber.id}`,
+        date: subscriber.started_at,
+        description: `Abonnement ${nomPlan}`,
+        amount: Number(subscriber.amount_paid),
+        type: 'subscription',
+        status: subscriber.status === 'pending_validation' ? 'pending' : 'completed',
+        reference: subscriber.payment_reference,
+        invoiceUrl: null
+      })
     }
+
+    for (const p of (data.purchases || [])) {
+      lignes.push({
+        id: `ed-${p.id}`,
+        date: p.created_at,
+        description: `Achat édition : ${p.edition?.title || ('n°' + p.edition_id)}`,
+        amount: Number(p.amount),
+        type: 'single',
+        status: p.status,
+        reference: p.payment_reference,
+        invoiceUrl: null
+      })
+    }
+
+    lignes.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    paymentHistory.value = lignes
   } catch (error) {
     console.error('Erreur lors du chargement de l\'historique:', error)
   } finally {
@@ -913,7 +1001,8 @@ const fetchPaymentHistory = async () => {
 
 const loadSubscriptionData = async () => {
   if (!isLoggedIn()) {
-    navigateTo(`/${currentLocale.value}/subscriber`)
+    // /subscriber n'existe pas (page desactivee) : y rediriger affichait un 404
+    navigateTo(`/${currentLocale.value}/alt-news`)
     return
   }
 
@@ -953,6 +1042,8 @@ const loadSubscriptionData = async () => {
         const planMap: { [key: string]: any } = {
           'free': { type: 'free', name: 'Gratuit', price: 0, features: ['Compte gratuit', 'Accès aux versions gratuites', 'Newsletter'] },
           'student': { type: 'student', name: 'Étudiant', price: 10000, features: ['Accès complet 12 mois', 'Versions premium', 'Tarif réduit'] },
+          // Absent jusqu'ici : les abonnés IUA / AUPROHADA-UCAO retombaient sur « Gratuit ».
+          'student_iua': { type: 'student_iua', name: 'Étudiant IUA / AUPROHADA-UCAO', price: 0, features: ['Accès 100 % gratuit', 'Intégralité des contenus Premium', 'Accès illimité sur 12 mois'] },
           'annual': { type: 'annual', name: 'Premium Annuel', price: 20000, features: ['Accès complet 12 mois', 'Versions premium', 'Envoi automatique', 'Accès archives'] },
           'monthly': { type: 'monthly', name: 'Premium Mensuel', price: 5000, features: ['Accès complet 1 mois', 'Versions premium'] }
         }
@@ -1027,6 +1118,19 @@ useHead({
 </script>
 
 <style scoped>
+.bandeau-recette {
+  background: #fef3c7;
+  border-bottom: 2px solid #f59e0b;
+  color: #92400e;
+  padding: 0.75rem 1.25rem;
+  text-align: center;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  position: sticky;
+  top: 0;
+  z-index: 500;
+}
+
 .manage-page {
   min-height: 100vh;
   background: linear-gradient(135deg, var(--cs-light-brown-color) 0%, #fef7f0 50%, #ffffff 100%);
@@ -1505,7 +1609,13 @@ useHead({
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  /*
+    Surtout pas `center` : un voile défilant qui centre son enfant rend le haut
+    de celui-ci inatteignable dès qu'il dépasse la hauteur d'écran — le contenu
+    déborde des deux côtés et le défilement ne le rattrape pas.
+    `margin: auto` sur l'enfant garde le centrage tant qu'il tient.
+  */
+  align-items: flex-start;
   justify-content: center;
   z-index: 9999;
   padding: 1rem;
@@ -1517,8 +1627,11 @@ useHead({
   border-radius: 20px;
   max-width: 1200px;
   width: 100%;
-  max-height: 90vh;
+  margin: auto;
+  max-height: calc(100vh - 2rem);
   overflow-y: auto;
+  /* Le défilement tactile doit rester fluide dans la fenêtre sur mobile. */
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 20px 60px rgba(107, 33, 168, 0.2);
   animation: modalSlideIn 0.3s ease;
 }
@@ -1576,6 +1689,15 @@ useHead({
 
 .upgrade-modal-body {
   padding: 0;
+}
+
+/*
+  `SubscriptionCompo` est une page entière : elle impose `min-height: 100vh`.
+  Encapsulée dans une fenêtre, cette hauteur la faisait déborder et repoussait
+  le bouton « Finaliser mon abonnement » hors du champ visible.
+*/
+.upgrade-modal-body :deep(.subscriber-page) {
+  min-height: 0;
 }
 
 /* Animation de la modal */

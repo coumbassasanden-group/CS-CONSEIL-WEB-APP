@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '~/composables/useAuth';
 import LoginModal from '~/components/LoginModal.vue';
+import SubscriptionCompo from '~/components/SubscriptionCompo.vue';
 import {
     PAXITY_CHECKOUT_DETAILS_KEY,
     PAXITY_CHECKOUT_REFERENCE_KEY,
@@ -33,12 +34,16 @@ const error = ref(null);
 
 // État pour le modal de connexion et paiement
 const showLoginModal = ref(false);
+const showPlansModal = ref(false);
 const showPaymentModal = ref(false);
 const selectedEditionForPurchase = ref(null);
 const paymentTransactionId = ref('');
 const paymentPhone = ref('');
 const phoneError = ref('');
-const UNIT_PRICE = 2000;
+const { actif: modeTest, tarif } = useModeTest();
+
+// Tarif unitaire d'une édition, ramené à 100 F sur les URL de recette.
+const UNIT_PRICE = computed(() => tarif(2000));
 
 // —————————————————————————— Paiement Paxity
 // Remplace CinetPay, dont le CDN (cdn.cinetpay.com/seamless/main.js) répond 522
@@ -53,11 +58,16 @@ const {
 
 const paymentMethods = ref([]);
 const selectedMethodId = ref('');
+const { ouvrir: ouvrirWidgetCarte, loading: widgetLoading } = usePaxityWidget();
+const { pays, paysChoisi, moyensDuPays, charger: chargerCatalogue } = usePaymentCountries();
 
 // —————————————————————————— Carte bancaire
 // Fermée tant que Paxity n'a pas habilité le business : son endpoint
 // `pay-in-card` répond 403. Le drapeau évite d'afficher une option morte.
-const cardEnabled = computed(() => String(config.public.paxityCardEnabled) === 'true');
+// La carte est ouverte dès que le widget Paxity est actif : c'est lui qui
+// collecte le numéro, chez Paxity. `paxityCardEnabled` gouverne l'autre chemin,
+// celui de notre route /card qui reçoit le PAN, et reste fermé.
+const cardEnabled = computed(() => String(config.public.paxityCardWidget) === 'true');
 const isCardSelected = computed(() => selectedMethodId.value === PAXITY_CARD_METHOD_ID);
 
 /**
@@ -91,6 +101,51 @@ const isPaying = ref(false);
 
 const brokenLogos = ref(new Set());
 
+const convertedAmount = ref(null);
+const convertLoading = ref(false);
+
+/**
+ * Montant réellement débité quand le moyen choisi n'est pas libellé en XOF.
+ *
+ * Purement informatif : c'est le serveur qui refait la conversion au moment de
+ * créer la transaction. L'afficher évite qu'un client voie « 2 000 FCFA » et
+ * retrouve « 37,60 GHS » sur son relevé sans explication.
+ */
+const refreshConvertedAmount = async () => {
+    const devise = selectedMethod.value?.currency;
+    const montant = tarif(selectedEditionForPurchase.value?.price || 2000);
+
+    if (!devise || devise === 'XOF') {
+        convertedAmount.value = null;
+        return;
+    }
+
+    convertLoading.value = true;
+    try {
+        const data = await $fetch('/api/payment/paxity/convert', {
+            query: { amount: montant, currency: devise }
+        });
+        convertedAmount.value = data;
+    } catch {
+        // Un taux indisponible ne doit pas empêcher de payer : le serveur
+        // retentera la conversion, on se contente de ne rien annoncer.
+        convertedAmount.value = null;
+    } finally {
+        convertLoading.value = false;
+    }
+};
+
+watch(selectedMethodId, refreshConvertedAmount);
+
+watch(paysChoisi, () => {
+    if (!paymentMethods.value.length) return;
+    paymentMethods.value = appendCardOption(moyensDuPays.value, cardEnabled.value);
+    if (!paymentMethods.value.some((m) => m.id === selectedMethodId.value)) {
+        const first = paymentMethods.value.find((m) => m.available !== false);
+        selectedMethodId.value = first ? first.id : '';
+    }
+});
+
 const selectedMethod = computed(
     () => paymentMethods.value.find((method) => method.id === selectedMethodId.value) || null
 );
@@ -101,8 +156,8 @@ const loadPaymentMethods = async () => {
     methodsLoading.value = true;
     methodsError.value = '';
     try {
-        const methods = await getPaxityMethods('CI');
-        paymentMethods.value = appendCardOption(methods, cardEnabled.value);
+        await chargerCatalogue();
+        paymentMethods.value = appendCardOption(moyensDuPays.value, cardEnabled.value);
 
         // Ne présélectionne jamais un moyen indisponible.
         if (!selectedMethodId.value) {
@@ -240,9 +295,11 @@ onMounted(() => {
 
 // ===== Logique d'achat d'édition =====
 
-// Générer un ID de transaction unique
-const generateTransactionId = () => {
-    return 'ALT-ED-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+// Référence marchand. Elle porte l'édition et l'abonné : le webhook Paxity
+// s'en sert pour enregistrer l'achat côté serveur, même quand le navigateur
+// ne revient jamais (paiement par carte, onglet fermé).
+const generateTransactionId = (editionId, userId) => {
+    return `ED-${editionId}-S${userId}-${Date.now()}`;
 };
 
 // Vérifier si le téléphone est valide
@@ -266,8 +323,11 @@ const handleBuyEdition = (edition) => {
 
 // Ouvrir le modal de paiement
 const openPaymentModal = () => {
-    paymentTransactionId.value = generateTransactionId();
     const user = getAuthUser();
+    paymentTransactionId.value = generateTransactionId(
+        selectedEditionForPurchase.value?.id,
+        user?.id || user?.userId || 0
+    );
     paymentPhone.value = user?.phone || '';
     phoneError.value = '';
     paymentError.value = '';
@@ -298,7 +358,7 @@ const onLoginSuccess = (user) => {
 // Callback pour inscription
 const onRegisterClick = () => {
     showLoginModal.value = false;
-    // Rediriger vers la page d'abonnement avec l'édition en paramètre
+    // On memorise l'edition en cours pour reprendre l'achat apres creation du compte
     const editionId = selectedEditionForPurchase.value?.id;
     if (editionId) {
         localStorage.setItem('pendingEditionPurchase', JSON.stringify({
@@ -306,7 +366,9 @@ const onRegisterClick = () => {
             returnUrl: route.fullPath
         }));
     }
-    router.push(`/${currentLocale.value}/subscriber`);
+    // La route /subscriber n'existe pas (page desactivee) : rediriger dessus renvoyait un 404.
+    // On ouvre le choix des plans dans la page, comme le fait deja alt-news/[id].vue.
+    showPlansModal.value = true;
 };
 
 // Lancer le paiement via Paxity
@@ -328,16 +390,13 @@ const startPayment = async () => {
             phoneError.value = 'Le numéro doit contenir au moins 8 chiffres';
             return;
         }
-    } else if (!isCardValid.value) {
-        paymentError.value = 'Veuillez compléter les informations de votre carte.';
-        return;
     }
 
     phoneError.value = '';
     paymentError.value = '';
 
     const edition = selectedEditionForPurchase.value;
-    const amount = edition?.price || UNIT_PRICE;
+    const amount = tarif(edition?.price || 2000);
     const user = getAuthUser();
 
     // Seules les méthodes QR_CODE renvoient une page opérateur ; les méthodes
@@ -351,24 +410,23 @@ const startPayment = async () => {
         let checkout;
 
         if (isCardSelected.value) {
-            const [expiryMonth, expiryYear] = cardFields.value.expiry.split('/');
-            try {
-                checkout = await createPaxityCardCheckout({
-                    amount,
-                    cardNumber: cardFields.value.cardNumber,
-                    expiryMonth,
-                    expiryYear,
-                    cvv: cardFields.value.cvv,
-                    holderFirstName: cardFields.value.holderFirstName,
-                    holderLastName: cardFields.value.holderLastName,
-                    reference: paymentTransactionId.value,
-                    description: `ALT News - ${edition?.title || 'édition'}`
-                });
-            } finally {
-                // Les données de carte disparaissent dès l'appel terminé,
-                // succès comme échec.
-                resetCardFields();
-            }
+            // Le widget Paxity prend le relais : il affiche son propre
+            // formulaire, collecte le numéro et le cryptogramme chez lui, et
+            // poste la transaction. Rien de tout cela ne passe par nos
+            // serveurs, donc rien à effacer ni à protéger ici.
+            await ouvrirWidgetCarte({
+                amount,
+                currency: 'XOF',
+                country: 'CI',
+                idClient: paymentTransactionId.value,
+                ipn: `${window.location.origin}/api/payment/paxity/webhook`
+            });
+
+            // Le widget mène le paiement jusqu'au bout de son côté : il n'y a
+            // pas de `checkout` à enchaîner, et la suite du flux ne s'applique
+            // pas.
+            isPaying.value = false;
+            return;
         } else {
             checkout = await createPaxityCheckout({
                 method: selectedMethodId.value,
@@ -386,6 +444,12 @@ const startPayment = async () => {
             transactionId: paymentTransactionId.value,
             reference: checkout.reference,
             userId: user?.id || user?.userId || user?.email,
+            // Mémorisé ici pour que la page de suivi puisse enregistrer l'achat
+            // même si la session a expiré entre-temps : le backend identifie
+            // l'acheteur par e-mail, nom et prénom, pas par le jeton.
+            email: user?.email,
+            firstName: user?.firstName,
+            lastName: user?.lastName,
             amount,
             phone,
             paymentMethod: selectedMethodId.value,
@@ -423,6 +487,12 @@ const startPayment = async () => {
 
 <template>
     <div class="tp-project-area tp-project-2-animate-tab  pb-110">
+        <!-- Bandeau de recette : cette page encaisse 100 F au lieu du tarif réel. -->
+        <div v-if="modeTest" class="bandeau-recette">
+            <strong>Mode recette</strong> — les paiements de cette page sont ramenés à
+            <strong>100 FCFA</strong>. Les débits sont bien réels.
+            Ne pas communiquer cette adresse aux clients.
+        </div>
         <div class="container">
 
 
@@ -529,7 +599,7 @@ const startPayment = async () => {
                             </div>
                             <!-- Prix pour éditions premium -->
                             <div v-if="!news.has_free_version && !news.is_free" class="edition-price-tag">
-                                {{ formatPrice(news.price || 2000) }} FCFA
+                                {{ formatPrice(tarif(news.price || 2000)) }} FCFA
                             </div>
                         </div>
                         <div class="tp-service-2-content p-absolute">
@@ -556,7 +626,7 @@ const startPayment = async () => {
                                     class="btn-buy-edition"
                                 >
                                     <i class="fa-solid fa-shopping-cart me-2"></i>
-                                    {{ $t('alt_news.purchase.buy_edition') }} {{ formatPrice(news.price || 2000) }} FCFA
+                                    {{ $t('alt_news.purchase.buy_edition') }} {{ formatPrice(tarif(news.price || 2000)) }} FCFA
                                 </button>
                             </div>
                         </div>
@@ -630,6 +700,23 @@ const startPayment = async () => {
         @register-click="onRegisterClick"
     />
 
+    <!-- Modal de choix du plan / creation de compte -->
+    <Teleport to="body">
+        <div v-if="showPlansModal" class="plans-modal-overlay" @click.self="showPlansModal = false">
+            <div class="plans-modal">
+                <div class="plans-modal-header">
+                    <h3>Choisissez votre plan</h3>
+                    <button class="btn-close-modal" @click="showPlansModal = false" type="button">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="plans-modal-body">
+                    <SubscriptionCompo @open-login-modal="showPlansModal = false; showLoginModal = true" />
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
     <!-- Modal de paiement -->
     <Teleport to="body">
         <div v-if="showPaymentModal" class="payment-modal-overlay" @click.self="closePaymentModal">
@@ -648,7 +735,7 @@ const startPayment = async () => {
                         <img :src="`${config.public.apiBaseUrl}/storage/${selectedEditionForPurchase.image}`" :alt="selectedEditionForPurchase.title" />
                         <div class="edition-info">
                             <h3>{{ selectedEditionForPurchase.title }}</h3>
-                            <p class="edition-price-modal">{{ formatPrice(selectedEditionForPurchase.price || UNIT_PRICE) }} FCFA</p>
+                            <p class="edition-price-modal">{{ formatPrice(tarif(selectedEditionForPurchase.price || 2000)) }} FCFA</p>
                         </div>
                     </div>
 
@@ -677,7 +764,15 @@ const startPayment = async () => {
                         <p v-if="methodsLoading" class="method-hint">Chargement des moyens de paiement…</p>
                         <p v-else-if="methodsError" class="phone-error">{{ methodsError }}</p>
 
-                        <div v-else class="method-grid">
+                        <!-- Pays : présélectionné d'après l'IP, modifiable. -->
+                        <div class="country-picker">
+                            <label class="country-picker-label">Pays du moyen de paiement</label>
+                            <select v-model="paysChoisi" class="country-picker-select">
+                                <option v-for="p in pays" :key="p.code" :value="p.code">{{ p.nom }}</option>
+                            </select>
+                        </div>
+
+                        <div v-if="!methodsLoading && !methodsError" class="method-grid">
                             <button
                                 v-for="method in paymentMethods"
                                 :key="method.id"
@@ -704,27 +799,34 @@ const startPayment = async () => {
                             </button>
                         </div>
 
+                        <p v-if="convertLoading" class="method-hint">Calcul du montant…</p>
+                        <p v-else-if="convertedAmount" class="method-hint conversion-note">
+                            Ce moyen encaisse en {{ convertedAmount.to }} :
+                            vous serez débité de
+                            <strong>{{ convertedAmount.convertedAmount }} {{ convertedAmount.to }}</strong>
+                            (équivalent de {{ formatPrice(convertedAmount.amount) }} FCFA).
+                        </p>
+
                         <p v-if="selectedMethod?.instructions" class="method-hint">
                             {{ selectedMethod.instructions }}
                         </p>
                     </div>
 
-                    <!-- Formulaire carte : monté sous v-if pour que Vue détruise
-                         l'état — et donc les données de carte — à la fermeture. -->
-                    <PaymentCardForm
-                        v-if="isCardSelected"
-                        v-model="cardFields"
-                        :disabled="isPaying"
-                    />
+                    <!-- Aucun champ de carte ici : le widget Paxity affiche son
+                         propre formulaire et collecte le numéro chez lui. -->
+                    <p v-if="isCardSelected" class="method-hint conversion-note">
+                        Le paiement par carte s'ouvre dans une fenêtre sécurisée de Paxity.
+                        Vos coordonnées bancaires ne transitent pas par notre site.
+                    </p>
 
                     <div class="payment-summary">
                         <div class="summary-row">
                             <span>Prix de l'édition</span>
-                            <span>{{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA</span>
+                            <span>{{ formatPrice(tarif(selectedEditionForPurchase?.price || 2000)) }} FCFA</span>
                         </div>
                         <div class="summary-row total">
                             <span>Total à payer</span>
-                            <span>{{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA</span>
+                            <span>{{ formatPrice(tarif(selectedEditionForPurchase?.price || 2000)) }} FCFA</span>
                         </div>
                     </div>
 
@@ -733,13 +835,15 @@ const startPayment = async () => {
                     <button
                         @click="startPayment"
                         class="btn-pay"
-                        :disabled="!selectedMethodId || isPaying || (isCardSelected ? !isCardValid : !isPhoneValid)"
+                        :disabled="!selectedMethodId || isPaying || widgetLoading || (!isCardSelected && !isPhoneValid)"
                     >
                         <!-- Cadenas et non carte bancaire : seuls les moyens mobile money
                              sont proposés, une icône de carte laissait croire le contraire. -->
                         <i class="fa-solid fa-lock me-2"></i>
-                        <template v-if="isPaying">Paiement en cours…</template>
-                        <template v-else>Payer {{ formatPrice(selectedEditionForPurchase?.price || UNIT_PRICE) }} FCFA</template>
+                        <template v-if="widgetLoading">Ouverture du paiement sécurisé…</template>
+                        <template v-else-if="isPaying">Paiement en cours…</template>
+                        <template v-else-if="isCardSelected">Payer par carte {{ formatPrice(tarif(selectedEditionForPurchase?.price || 2000)) }} FCFA</template>
+                        <template v-else>Payer {{ formatPrice(tarif(selectedEditionForPurchase?.price || 2000)) }} FCFA</template>
                     </button>
                 </div>
             </div>
@@ -822,6 +926,56 @@ const startPayment = async () => {
 }
 
 /* Prix pour éditions premium */
+.conversion-note {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+    border-radius: 8px;
+    padding: 0.7rem 0.85rem;
+    line-height: 1.5;
+}
+
+.bandeau-recette {
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    color: #92400e;
+    padding: 0.75rem 1.25rem;
+    text-align: center;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+
+.country-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.9rem;
+}
+.country-picker-label {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+.country-picker-select {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    font: inherit;
+    background: #fff;
+}
+.conversion-note {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+    border-radius: 8px;
+    padding: 0.7rem 0.85rem;
+    line-height: 1.5;
+    font-size: 0.9rem;
+    margin: 0.5rem 0;
+}
+
 .edition-price-tag {
     position: absolute;
     top: 15px;
@@ -1470,5 +1624,82 @@ const startPayment = async () => {
         font-size: 0.85rem;
         padding: 0.65rem 1rem;
     }
+}
+
+/* Modal de choix du plan (reprise des styles de alt-news/[id].vue) */
+.plans-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.plans-modal {
+    background: white;
+    border-radius: 20px;
+    max-width: 1200px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(107, 33, 168, 0.2);
+    animation: plansModalSlideIn 0.3s ease;
+}
+
+@keyframes plansModalSlideIn {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.plans-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid #d4b128;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.plans-modal-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #d4b128;
+    margin: 0;
+}
+
+.btn-close-modal {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: #f3f4f6;
+    border-radius: 50%;
+    font-size: 1.8rem;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.btn-close-modal:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+}
+
+.plans-modal-body {
+    padding: 0;
 }
 </style>

@@ -130,12 +130,21 @@ export const usePaxityCheckout = () => {
     }
   }
 
-  /** Moyens de paiement actifs, éventuellement filtrés par pays. */
-  const getMethods = async (country?: string) => {
+  /**
+   * Moyens de paiement actifs, filtrables par pays et par devise.
+   *
+   * Filtrer sur `currency` est la garantie de facturer le bon montant : le
+   * serveur encaisse dans la devise de la méthode choisie, donc proposer une
+   * méthode en GHS ferait payer « 2000 GHS » un article affiché à 2000 XOF.
+   */
+  const getMethods = async (filtres: { country?: string; currency?: string } = {}) => {
     loading.value = true
     try {
       return await call<PaxityPaymentMethod[]>('/api/payment/paxity/methods', {
-        query: country ? { country } : {}
+        query: {
+          ...(filtres.country ? { country: filtres.country } : {}),
+          ...(filtres.currency ? { currency: filtres.currency } : {})
+        }
       })
     } finally {
       loading.value = false

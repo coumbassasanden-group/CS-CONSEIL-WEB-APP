@@ -19,8 +19,8 @@
           </div>
         </div>
 
-        <!-- Champ telephone -->
-        <div class="phone-input-wrapper">
+        <!-- Champ telephone : inutile pour la carte, que Paxity collecte. -->
+        <div v-if="!isCardSelected" class="phone-input-wrapper">
           <label for="phone" class="phone-label">
             <Icon icon="mdi:phone" /> Numero de telephone
           </label>
@@ -64,7 +64,14 @@
             </button>
           </div>
 
-          <div v-else-if="paymentMethods.length" class="payment-methods-grid">
+          <div v-else-if="paymentMethods.length" class="country-picker">
+            <label class="country-picker-label">Pays du moyen de paiement</label>
+            <select v-model="paysChoisi" class="country-picker-select">
+              <option v-for="p in pays" :key="p.code" :value="p.code">{{ p.nom }}</option>
+            </select>
+          </div>
+
+          <div v-if="!methodsLoading && !methodsError && paymentMethods.length" class="payment-methods-grid">
             <label
               v-for="method in paymentMethods"
               :key="getPaymentMethodValue(method)"
@@ -96,6 +103,13 @@
           </div>
         </div>
 
+        <p v-if="conversionEnCours" class="conversion-note">Calcul du montant…</p>
+        <p v-else-if="montantConverti" class="conversion-note">
+          Ce moyen encaisse en {{ montantConverti.to }} : vous serez débité de
+          <strong>{{ montantConverti.convertedAmount }} {{ montantConverti.to }}</strong>
+          (équivalent de {{ formatPrice(montantConverti.amount) }}).
+        </p>
+
         <p v-if="checkoutError" class="checkout-error">{{ checkoutError }}</p>
 
         <button
@@ -105,7 +119,15 @@
           @click="handlePay"
         >
           <Icon :icon="isPaying ? 'mdi:loading' : 'mdi:lock'" :class="{ spin: isPaying }" />
-          {{ isPaying ? 'Paiement en cours...' : `Payer ${formatPrice(unitPrice)}` }}
+          {{
+            widgetLoading
+              ? 'Ouverture du paiement sécurisé…'
+              : isPaying
+                ? 'Paiement en cours...'
+                : isCardSelected
+                  ? `Payer par carte ${formatPrice(unitPrice)}`
+                  : `Payer ${formatPrice(unitPrice)}`
+          }}
         </button>
       </div>
     </div>
@@ -116,12 +138,16 @@
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
+  PAXITY_CARD_METHOD_ID,
   PAXITY_CHECKOUT_DETAILS_KEY,
   PAXITY_CHECKOUT_REFERENCE_KEY,
   PAXITY_PENDING_EDITION_PURCHASE_KEY,
+  appendCardOption,
   type PaxityPaymentMethod,
   usePaxityCheckout
 } from '~/composables/usePaxityCheckout'
+import { usePaxityWidget } from '~/composables/usePaxityWidget'
+import { usePaymentCountries, useMontantConverti } from '~/composables/usePaymentCountries'
 import { useAuth } from '~/composables/useAuth'
 
 interface Edition {
@@ -144,7 +170,14 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
+const config = useRuntimeConfig()
 const { getAuthUser } = useAuth()
+const { ouvrir: ouvrirWidgetCarte, loading: widgetLoading } = usePaxityWidget()
+const { pays, paysChoisi, moyensDuPays, charger: chargerCatalogue } = usePaymentCountries()
+
+/** La carte n'est proposée que si le widget Paxity est actif. */
+const cardEnabled = computed(() => String(config.public.paxityCardWidget) === 'true')
+const isCardSelected = computed(() => selectedPaymentMethod.value === PAXITY_CARD_METHOD_ID)
 const {
   createCheckout,
   error: paxityError,
@@ -173,6 +206,19 @@ const selectedMethodDetails = computed(
   () => paymentMethods.value.find(method => method.id === selectedPaymentMethod.value) || null
 )
 
+const { converti: montantConverti, chargement: conversionEnCours } = useMontantConverti(
+  () => props.unitPrice,
+  () => selectedMethodDetails.value?.currency
+)
+
+watch(paysChoisi, () => {
+  if (!paymentMethods.value.length) return
+  paymentMethods.value = appendCardOption(moyensDuPays.value, cardEnabled.value)
+  if (!paymentMethods.value.some(method => method.id === selectedPaymentMethod.value)) {
+    selectedPaymentMethod.value = paymentMethods.value.find(method => method.available !== false)?.id || ''
+  }
+})
+
 const loadPaymentMethods = async () => {
   if (methodsLoading.value) return
 
@@ -180,7 +226,8 @@ const loadPaymentMethods = async () => {
   methodsError.value = ''
 
   try {
-    paymentMethods.value = await getMethods('CI')
+    await chargerCatalogue()
+    paymentMethods.value = appendCardOption(moyensDuPays.value, cardEnabled.value)
     const selectionExists = paymentMethods.value.some(
       method => getPaymentMethodValue(method) === selectedPaymentMethod.value
     )
@@ -214,7 +261,9 @@ const isPhoneValid = computed(() => {
 })
 
 const canPay = computed(() => {
-  return isPhoneValid.value &&
+  // Le widget collecte lui-même les coordonnées : pas de téléphone à saisir.
+  return (isCardSelected.value || isPhoneValid.value) &&
+    !widgetLoading.value &&
     !!props.edition &&
     !!selectedPaymentMethod.value &&
     !methodsLoading.value &&
@@ -223,6 +272,31 @@ const canPay = computed(() => {
 
 // Handle pay click
 const handlePay = async () => {
+  checkoutError.value = ''
+
+  // Carte : le widget Paxity affiche son propre formulaire et collecte le
+  // numéro chez lui. Aucun téléphone requis, et rien à valider ici.
+  if (isCardSelected.value) {
+    if (!props.edition) {
+      checkoutError.value = 'Édition introuvable'
+      return
+    }
+
+    try {
+      await ouvrirWidgetCarte({
+        amount: props.unitPrice,
+        currency: 'XOF',
+        country: 'CI',
+        idClient: `ED-${props.edition.id}-S${(getAuthUser() || {}).id || 0}-${Date.now()}`,
+        ipn: `${window.location.origin}/api/payment/paxity/webhook`
+      })
+    } catch (error: any) {
+      checkoutError.value = error?.message
+        || 'Impossible d\'ouvrir le paiement par carte.'
+    }
+    return
+  }
+
   const phone = phoneNumber.value.trim()
 
   if (!phone) {
@@ -264,7 +338,9 @@ const handlePay = async () => {
   isPaying.value = true
 
   try {
-    const transactionId = `ED-${props.edition.id}-${Date.now()}`
+    // Porte l'édition et l'abonné : le webhook Paxity enregistre l'achat même
+    // si le navigateur ne revient pas (carte, onglet fermé).
+    const transactionId = `ED-${props.edition.id}-S${userId}-${Date.now()}`
     const checkout = await createCheckout({
       method: selectedPaymentMethod.value,
       amount: props.unitPrice,
@@ -278,6 +354,12 @@ const handlePay = async () => {
       transactionId,
       reference: checkout.reference,
       userId,
+      // Mémorisé ici pour que la page de suivi puisse enregistrer l'achat
+      // même si la session a expiré entre-temps : le backend identifie
+      // l'acheteur par e-mail, nom et prénom, pas par le jeton.
+      email: getAuthUser()?.email,
+      firstName: getAuthUser()?.firstName,
+      lastName: getAuthUser()?.lastName,
       amount: props.unitPrice,
       phone,
       paymentMethod: selectedPaymentMethod.value,
@@ -317,13 +399,22 @@ const imageUrl = computed(() => {
 </script>
 
 <style scoped>
+/*
+  Le voile défile lui-même et aligne en haut.
+
+  Il était centré sans hauteur maximale : dès que le contenu dépassait l'écran
+  — ce qu'a provoqué l'ajout de la carte aux moyens de paiement — il débordait
+  en haut comme en bas, le bouton « Payer » sortait du champ et rien ne
+  défilait, la page étant en `position: fixed`.
+*/
 .payment-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
   z-index: 1000;
   padding: 1rem;
 }
@@ -334,6 +425,10 @@ const imageUrl = computed(() => {
   max-width: 480px;
   width: 100%;
   position: relative;
+  /* Marge automatique : reste centré quand il tient, s'aligne en haut sinon. */
+  margin: auto;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
   animation: modalSlideIn 0.3s ease;
 }
 
@@ -440,6 +535,35 @@ const imageUrl = computed(() => {
 
 .payment-methods {
   margin-bottom: 1.5rem;
+}
+
+
+.country-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.9rem;
+}
+.country-picker-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+.country-picker-select {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font: inherit;
+  background: #fff;
+}
+.conversion-note {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  line-height: 1.5;
+  font-size: 0.9rem;
+  margin: 0.5rem 0;
 }
 
 .payment-methods-header {

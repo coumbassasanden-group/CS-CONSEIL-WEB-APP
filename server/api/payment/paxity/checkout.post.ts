@@ -1,9 +1,16 @@
-import { getPaxity, resolveMethod, splitPhone, toHttpError } from '../../../utils/paxity'
+import {
+  assertPhoneMatchesMethod,
+  convertirMontant,
+  getPaxity,
+  resolveMethod,
+  splitPhone,
+  toHttpError
+} from '../../../utils/paxity'
 
 interface CheckoutBody {
   /** Identifiant de méthode Paxity, ex. `WAVECI`. */
   method: string
-  /** Montant dans la devise de la méthode. */
+  /** Montant en XOF, la devise de nos tarifs. Converti ici si besoin. */
   amount: number
   /** Téléphone du payeur, saisi librement. */
   phone: string
@@ -46,6 +53,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Numéro de téléphone incomplet' })
   }
 
+  // Un numéro confié au mauvais opérateur est accepté par Paxity puis rejeté
+  // en aval, sans motif : autant le refuser ici, avec une consigne utilisable.
+  assertPhoneMatchesMethod(method.id, phone.number, method.country)
+
   if (method.type === 'OTP' && !body.otp) {
     throw createError({
       statusCode: 400,
@@ -53,13 +64,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Le montant arrive en XOF. Une méthode libellée dans une autre devise doit
+  // être encaissée dans la sienne : sans cette conversion, un article à
+  // 2000 XOF serait facturé « 2000 GHS », soit une vingtaine de fois son prix.
+  const montantAEncaisser = await convertirMontant(amount, method.currency)
+
   const config = useRuntimeConfig()
   const secret = String(config.paxityWebhookSecret || '')
   const publicUrl = String(config.public?.siteUrl || '') || getRequestURL(event).origin
 
   try {
     const transaction = await getPaxity().createPayment({
-      amount,
+      amount: montantAEncaisser,
       currency: method.currency,
       country: method.country,
       method: method.id,
